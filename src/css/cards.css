@@ -1,0 +1,60 @@
+/* src/css/cards.css */
+.ui-card {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+  transition: all var(--transition-normal);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+.ui-card:hover {
+  border-color: var(--border-color-hover);
+  box-shadow: var(--shadow-lg);
+  transform: translateY(-4px);
+}
+
+/* KPI Card Variations */
+.ui-card-primary { border-left: 4px solid var(--primary-color); }
+.ui-card-success { border-left: 4px solid var(--success-color); }
+.ui-card-warning { border-left: 4px solid var(--warning-color); }
+.ui-card-danger { border-left: 4px solid var(--danger-color); }
+
+.ui-card-primary .ui-card-icon-container { background: var(--bg-primary-light); color: var(--primary-color); border-radius: var(--radius-md); padding: 0.75rem; }
+.ui-card-success .ui-card-icon-container { background: var(--bg-success-light); color: var(--success-color); border-radius: var(--radius-md); padding: 0.75rem; }
+.ui-card-warning .ui-card-icon-container { background: var(--bg-warning-light); color: var(--warning-color); border-radius: var(--radius-md); padding: 0.75rem; }
+.ui-card-danger .ui-card-icon-container { background: var(--bg-danger-light); color: var(--danger-color); border-radius: var(--radius-md); padding: 0.75rem; }
+
+.ui-card-header {
+  padding: 1.5rem 1.5rem 0.5rem 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.ui-card-title {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.ui-card-content {
+  padding: 1.5rem;
+  flex: 1;
+}
+
+/* Glass Card */
+.ui-card-glass {
+  background-color: color-mix(in srgb, var(--bg-card) 60%, transparent);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: var(--shadow-glass);
+  border: 1px solid color-mix(in srgb, var(--border-color) 50%, transparent);
+}

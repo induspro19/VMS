@@ -1,0 +1,83 @@
+/* src/css/header.css */
+.ui-layout-header {
+  height: 60px;
+  padding: 0 1.5rem;
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 1.5rem;
+  background-color: var(--bg-card);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  box-shadow: var(--shadow-sm);
+}
+
+/* For browsers that support #RRGGBBAA hex */
+@supports (backdrop-filter: blur(12px)) {
+  .ui-layout-header {
+    background-color: color-mix(in srgb, var(--bg-card) 85%, transparent);
+  }
+}
+
+.ui-theme-toggle {
+  display: flex;
+  gap: 0.25rem;
+  padding: 0.25rem;
+  background-color: var(--bg-input);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+}
+
+.ui-theme-toggle button {
+  padding: 0.5rem;
+  border-radius: var(--radius-sm);
+  border: none;
+  background-color: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.ui-theme-toggle button:hover {
+  color: var(--text-primary);
+}
+
+.ui-theme-toggle button.active {
+  background-color: var(--bg-card);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-sm);
+}
+
+.ui-search-box {
+  position: relative;
+  width: 300px;
+}
+
+.ui-search-box input {
+  width: 100%;
+  padding: 0.6rem 1rem 0.6rem 2.5rem;
+  border-radius: var(--radius-full);
+  background-color: var(--bg-input);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  outline: none;
+  transition: all var(--transition-fast);
+  box-shadow: var(--shadow-sm);
+}
+
+.ui-search-box input:focus {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px var(--bg-primary-light);
+}
+
+.ui-search-icon {
+  position: absolute;
+  left: 0.85rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+}

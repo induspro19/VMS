@@ -1,0 +1,50 @@
+/* src/css/tables.css */
+.ui-table-container {
+  width: 100%;
+  overflow-x: auto;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-color);
+  background-color: var(--bg-card);
+}
+
+.ui-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.ui-table th {
+  padding: 0.75rem 1rem;
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--text-secondary);
+  background-color: var(--bg-card-hover);
+  border-bottom: 1px solid var(--border-color);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.ui-table td {
+  padding: 0 1rem;
+  height: 44px;
+  font-size: 13px;
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.ui-table tr:last-child td {
+  border-bottom: none;
+}
+
+.ui-table tbody tr {
+  transition: background-color var(--transition-fast);
+}
+
+.ui-table tbody tr:nth-child(even) {
+  background-color: color-mix(in srgb, var(--bg-card-hover) 30%, transparent);
+}
+
+.ui-table tbody tr:hover {
+  background-color: var(--bg-card-hover);
+}

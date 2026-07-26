@@ -1,0 +1,88 @@
+/* src/css/variables.css */
+:root {
+  /* Radius */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 12px;
+  --radius-full: 9999px;
+
+  /* Transitions */
+  --transition-fast: 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-normal: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+[data-theme='dark'] {
+  --bg-main: #0c0d0f;
+  --bg-card: #16181d;
+  --bg-card-hover: #1e2026;
+  --bg-input: #1f2128;
+  --bg-selected: rgba(94, 106, 210, 0.15);
+  
+  --text-primary: #f0f0f2;
+  --text-secondary: #a1a3a8;
+  --text-muted: #6b6d76;
+
+  --border-color: #2b2d35;
+  --border-color-hover: #3d3f4a;
+
+  /* Accent Colors - Premium Enterprise Dark */
+  --primary-color: #5e6ad2;
+  --primary-hover: #6f7bf0;
+  --success-color: #2da44e;
+  --warning-color: #d29922;
+  --danger-color: #da3633;
+  --info-color: #2f81f7;
+
+  /* Shadows Dark - Thin Enterprise */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 2px 6px 0 rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 4px 12px 0 rgba(0, 0, 0, 0.6);
+  --shadow-xl: 0 8px 24px 0 rgba(0, 0, 0, 0.7);
+  --shadow-glass: 0 4px 20px 0 rgba(0, 0, 0, 0.4);
+
+  /* Background Accents */
+  --bg-success-light: rgba(45, 164, 78, 0.15);
+  --bg-warning-light: rgba(210, 153, 34, 0.15);
+  --bg-danger-light: rgba(218, 54, 51, 0.15);
+  --bg-info-light: rgba(47, 129, 247, 0.15);
+  --bg-primary-light: rgba(94, 106, 210, 0.15);
+}
+
+[data-theme='light'] {
+  --bg-main: #F4F5F7;
+  --bg-card: #FFFFFF;
+  --bg-card-hover: #F8F9FB;
+  --bg-input: #FFFFFF;
+  --bg-selected: #EDEFFC;
+  
+  --text-primary: #172B4D;
+  --text-secondary: #5E6C84;
+  --text-muted: #8993A4;
+
+  --border-color: #DFE1E6;
+  --border-color-hover: #C1C7D0;
+
+  /* Accent Colors - Premium Enterprise Light */
+  --primary-color: #0052CC;
+  --primary-hover: #0747A6;
+  --success-color: #00875A;
+  --warning-color: #FF991F;
+  --danger-color: #DE350B;
+  --info-color: #00B8D9;
+
+  /* Shadows Light - Thin Enterprise */
+  --shadow-sm: 0 1px 2px 0 rgba(9, 30, 66, 0.08);
+  --shadow-md: 0 2px 6px 0 rgba(9, 30, 66, 0.12);
+  --shadow-lg: 0 4px 12px 0 rgba(9, 30, 66, 0.16);
+  --shadow-xl: 0 8px 24px 0 rgba(9, 30, 66, 0.20);
+  --shadow-glass: 0 4px 20px 0 rgba(9, 30, 66, 0.12);
+
+  /* Background Accents */
+  --bg-success-light: rgba(0, 135, 90, 0.1);
+  --bg-warning-light: rgba(255, 153, 31, 0.1);
+  --bg-danger-light: rgba(222, 53, 11, 0.1);
+  --bg-info-light: rgba(0, 184, 217, 0.1);
+  --bg-primary-light: rgba(0, 82, 204, 0.1);
+}

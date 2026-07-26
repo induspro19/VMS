@@ -1,0 +1,154 @@
+.boarding-pass-card {
+  width: 100%;
+  max-width: 480px;
+  background-color: var(--bg-card);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-color);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Add ticket cutouts */
+.boarding-pass-card::before,
+.boarding-pass-card::after {
+  content: '';
+  position: absolute;
+  top: 140px;
+  width: 30px;
+  height: 30px;
+  background-color: var(--bg-main);
+  border-radius: 50%;
+  border: 1px solid var(--border-color);
+}
+
+.boarding-pass-card::before {
+  left: -16px;
+  border-right-color: transparent;
+  border-top-color: transparent;
+  border-bottom-color: transparent;
+}
+
+.boarding-pass-card::after {
+  right: -16px;
+  border-left-color: transparent;
+  border-top-color: transparent;
+  border-bottom-color: transparent;
+}
+
+.boarding-header {
+  background-color: var(--primary-color);
+  color: white;
+  padding: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+}
+
+.boarding-header h2 {
+  margin: 0;
+  font-size: 1.25rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.boarding-success-icon {
+  color: var(--success-color);
+  display: flex;
+  justify-content: center;
+  margin-top: 2.5rem;
+}
+
+.boarding-thankyou {
+  text-align: center;
+  font-size: 1.5rem;
+  margin: 1rem 0 2rem;
+  color: var(--text-primary);
+}
+
+.boarding-details {
+  padding: 0 2.5rem 2rem;
+}
+
+.detail-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
+.detail-row .label {
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+}
+
+.detail-row .value {
+  font-weight: 600;
+  color: var(--text-primary);
+  text-align: right;
+}
+
+.detail-divider {
+  height: 1px;
+  border-top: 2px dashed var(--border-color);
+  margin: 1.5rem 0;
+}
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  margin-bottom: 1.5rem;
+}
+
+.detail-col {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.text-right {
+  text-align: right;
+}
+
+.detail-col .label {
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.detail-col .value {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.detail-highlight {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 1rem;
+  background-color: var(--bg-primary-light);
+  border-radius: var(--radius-md);
+  color: var(--primary-color);
+}
+
+.detail-highlight strong {
+  font-size: 1.125rem;
+}
+
+.boarding-footer {
+  padding: 1.5rem;
+  background-color: var(--bg-input);
+  border-top: 1px solid var(--border-color);
+  text-align: center;
+}
+
+.boarding-footer p {
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  margin-bottom: 1rem;
+}

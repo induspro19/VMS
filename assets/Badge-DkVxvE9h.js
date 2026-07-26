@@ -1,0 +1,1 @@
+import{r as e}from"./rolldown-runtime-QTnfLwEv.js";import{n as t,r as n}from"./createLucideIcon-B82nIOwL.js";import{n as r}from"./index-BzzvfUPw.js";var i=e(n(),1),a=t(),o=i.forwardRef(({className:e,variant:t=`default`,children:n,...i},o)=>(0,a.jsx)(`span`,{ref:o,className:r(`ui-badge`,`ui-badge-${t}`,e),...i,children:n}));o.displayName=`Badge`;export{o as t};

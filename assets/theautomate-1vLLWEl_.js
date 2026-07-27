@@ -1,0 +1,1 @@
+import{D as e}from"./index-DEB7JkWX.js";var t=async({visitorId:t})=>{try{let{error:n}=await e.functions.invoke(`send-checkout-whatsapp`,{body:{visitorId:t}});if(n)throw n;return!0}catch(e){return console.error(`Unable to send checkout WhatsApp message:`,e),!1}};export{t as sendAutomateWhatsApp};

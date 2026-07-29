@@ -409,7 +409,11 @@ export const VisitorProvider: React.FC<{ children: React.ReactNode }> = ({ child
     addAuditLog(newVisitor.id, 'Registered', data.name, 'Visitor', '', 'PENDING_APPROVAL');
 
     try {
-      await supabase.from('visitors').insert([mapVisitorToDb(newVisitor)]);
+      const { error } = await supabase.from('visitors').insert([mapVisitorToDb(newVisitor)]);
+      if (error) {
+        alert("Database Insert Error: " + error.message);
+        throw error;
+      }
 
       if (newVisitor.hostEmployeeId) {
         supabase.functions.invoke('send-host-push', {

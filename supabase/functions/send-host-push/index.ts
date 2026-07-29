@@ -54,7 +54,7 @@ serve(async (req) => {
       title: "🔔 New Visitor Waiting",
       body: `${visitorName} from ${company} is waiting to meet you.`,
       visitorId: visitorId,
-      url: `/employee?tab=pending&visitor=${visitorId}`,
+      url: `/VMS/#/employee?tab=pending&visitor=${visitorId}`,
       type: 'VISITOR_WAITING'
     };
 

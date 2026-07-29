@@ -4,7 +4,7 @@ import type { Visitor } from '../../context/VisitorContext';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { useTheme } from '../../context/ThemeContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { updateAppBadge } from '../../lib/badging';
 import { NotificationCenter } from '../../components/NotificationCenter/NotificationCenter';
@@ -42,6 +42,7 @@ export const EmployeeDashboard: React.FC = () => {
   const { toast } = useToast();
   const { theme, setTheme } = useTheme();
   const navigate = useNavigate();
+  const location = useLocation();
 
   // State Management
   const [activeNavTab, setActiveNavTab] = useState<'HOME' | 'VISITORS' | 'APPOINTMENTS' | 'NOTIFICATIONS' | 'PROFILE'>('HOME');
@@ -49,6 +50,29 @@ export const EmployeeDashboard: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedVisitor, setSelectedVisitor] = useState<Visitor | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+
+  // Handle URL Parameters (e.g. from Push Notifications)
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const tabParam = params.get('tab');
+    const visitorIdParam = params.get('visitor');
+    
+    if (tabParam === 'pending') {
+      setActiveNavTab('HOME'); // Visitors are shown on home tab by default
+      setStatusFilter('PENDING');
+      
+      if (visitorIdParam && visitors.length > 0) {
+        const foundVisitor = visitors.find(v => v.id === visitorIdParam);
+        if (foundVisitor) {
+          setSelectedVisitor(foundVisitor);
+          setIsDrawerOpen(true);
+          
+          // Clean up URL after opening
+          navigate('/employee', { replace: true });
+        }
+      }
+    }
+  }, [location.search, visitors, navigate]);
 
   const [confirmModal, setConfirmModal] = useState<{ 
     isOpen: boolean; 

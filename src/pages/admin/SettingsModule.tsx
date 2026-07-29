@@ -1,254 +1,321 @@
 import React, { useState } from 'react';
 import { useSettings } from '../../context/SettingsContext';
-import { Settings as SettingsIcon, Save, Plus, Trash2, Building, Users, ShieldCheck } from 'lucide-react';
+import { Save, Plus, Trash2, Building, ShieldCheck, Tag, Shield, User, Power } from 'lucide-react';
 import { useToast } from '../../context/ToastContext';
+import { useAppUsers } from '../../context/UserContext';
+import { useVisitor } from '../../context/VisitorContext';
+import { useSecurityShift } from '../../context/SecurityShiftContext';
 
 export const SettingsModule: React.FC = () => {
   const { settings, updateSettings } = useSettings();
+  const { users } = useAppUsers();
+  const { visitors } = useVisitor();
   const { toast } = useToast();
-  
-  const [localSettings, setLocalSettings] = useState(settings);
+
   const [newDept, setNewDept] = useState('');
-  const [newEmployee, setNewEmployee] = useState('');
   const [newPurpose, setNewPurpose] = useState('');
+  const [companyName, setCompanyName] = useState(settings.companyName);
+  const [maxHours, setMaxHours] = useState(settings.meetingDurationMaxHours);
 
-  const handleSave = () => {
-    updateSettings(localSettings);
-    toast('Settings saved successfully.', 'success');
+  const { officers, addOfficer, deleteOfficer, toggleOfficerActive } = useSecurityShift();
+  const [newOfficerName, setNewOfficerName] = useState('');
+  const [newOfficerBadge, setNewOfficerBadge] = useState('');
+
+  const handleAddOfficer = () => {
+    const trimmed = newOfficerName.trim();
+    if (!trimmed) {
+      toast('Officer Name is required.', 'error');
+      return;
+    }
+    addOfficer(trimmed, newOfficerBadge.trim());
+    setNewOfficerName('');
+    setNewOfficerBadge('');
+    toast(`Security Officer "${trimmed}" added to master list.`, 'success');
   };
 
-  const addItem = (field: 'departments' | 'employees' | 'visitorPurposes', value: string, setter: React.Dispatch<React.SetStateAction<string>>) => {
-    if (!value.trim()) return;
-    setLocalSettings(prev => ({
-      ...prev,
-      [field]: [...prev[field], value.trim()]
-    }));
-    setter('');
+  const handleSaveProfile = () => {
+    updateSettings({ companyName, meetingDurationMaxHours: maxHours });
+    toast('Company profile saved successfully.', 'success');
   };
 
-  const removeItem = (field: 'departments' | 'employees' | 'visitorPurposes', index: number) => {
-    setLocalSettings(prev => ({
-      ...prev,
-      [field]: prev[field].filter((_, i) => i !== index)
-    }));
+  const addDepartment = () => {
+    const trimmed = newDept.trim();
+    if (!trimmed) return;
+    if (settings.departments.map(d => d.toLowerCase()).includes(trimmed.toLowerCase())) {
+      toast('Department already exists.', 'error');
+      return;
+    }
+    updateSettings({ departments: [...settings.departments, trimmed] });
+    setNewDept('');
+    toast(`Department "${trimmed}" added.`, 'success');
   };
 
-  const cardStyle = {
-    backgroundColor: '#FFFFFF',
-    borderRadius: '12px',
-    boxShadow: '0 2px 6px rgba(0,0,0,.05)',
-    border: '1px solid #E5E7EB',
-    padding: '16px',
-    display: 'flex',
-    flexDirection: 'column' as const,
-    gap: '12px',
-    maxHeight: '100%',
-    overflow: 'hidden'
+  const removeDepartment = (dept: string) => {
+    // Delete Protection: check assigned users
+    const usersInDept = users.filter(u => u.department === dept);
+    if (usersInDept.length > 0) {
+      toast(`Cannot delete "${dept}" — ${usersInDept.length} user(s) are assigned to it. Please reassign them first.`, 'error');
+      return;
+    }
+    // Delete Protection: check active checked-in visitors
+    const visitorsInDept = visitors.filter(v => v.department === dept && v.status === 'INSIDE');
+    if (visitorsInDept.length > 0) {
+      toast(`Cannot delete "${dept}" — ${visitorsInDept.length} visitor(s) currently checked in. Please wait for them to check out.`, 'error');
+      return;
+    }
+    updateSettings({ departments: settings.departments.filter(d => d !== dept) });
+    toast(`Department "${dept}" deleted.`, 'success');
   };
 
-  const inputStyle = {
-    height: '38px',
-    borderRadius: '8px',
-    border: '1px solid #E5E7EB',
-    padding: '10px 12px',
-    fontSize: '14px',
-    width: '100%',
-    outline: 'none',
-    boxSizing: 'border-box' as const,
-    backgroundColor: '#FFFFFF',
-    transition: 'border-color 0.2s, box-shadow 0.2s'
+  const addPurpose = () => {
+    const trimmed = newPurpose.trim();
+    if (!trimmed) return;
+    if (settings.visitorPurposes.map(p => p.toLowerCase()).includes(trimmed.toLowerCase())) {
+      toast('Visitor purpose already exists.', 'error');
+      return;
+    }
+    updateSettings({ visitorPurposes: [...settings.visitorPurposes, trimmed] });
+    setNewPurpose('');
+    toast(`Purpose "${trimmed}" added.`, 'success');
   };
 
-  const addBtnStyle = {
-    width: '38px',
-    height: '38px',
-    borderRadius: '8px',
-    background: '#2563EB',
-    border: 'none',
-    color: '#FFFFFF',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    cursor: 'pointer',
-    flexShrink: 0
-  };
-
-  const listContainerStyle = {
-    display: 'flex',
-    flexDirection: 'column' as const,
-    gap: '6px',
-    flex: 1,
-    overflowY: 'auto' as const,
-    paddingRight: '4px'
-  };
-
-  const listItemStyle = {
-    height: '48px',
-    backgroundColor: '#FFFFFF',
-    borderRadius: '8px',
-    border: '1px solid #E5E7EB',
-    display: 'flex',
-    alignItems: 'center',
-    padding: '0 12px',
-    gap: '12px',
-    flexShrink: 0,
-    transition: 'background-color 0.2s'
-  };
-
-  const listIconStyle = {
-    width: '32px',
-    height: '32px',
-    borderRadius: '50%',
-    backgroundColor: '#2563EB',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0
-  };
-
-  const listTitleStyle = {
-    fontSize: '15px',
-    fontWeight: 500,
-    color: '#111827',
-    lineHeight: '1.2'
-  };
-
-  const listSubtitleStyle = {
-    fontSize: '11px',
-    color: '#6B7280'
-  };
-
-  const delBtnStyle = {
-    width: '32px',
-    height: '32px',
-    borderRadius: '8px',
-    backgroundColor: '#FFFFFF',
-    border: '1px solid #E5E7EB',
-    color: '#6B7280',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    cursor: 'pointer',
-    flexShrink: 0,
-    transition: 'all 0.2s'
+  const removePurpose = (idx: number) => {
+    const target = settings.visitorPurposes[idx];
+    updateSettings({ visitorPurposes: settings.visitorPurposes.filter((_, i) => i !== idx) });
+    toast(`Purpose "${target}" removed.`, 'success');
   };
 
   return (
-    <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', backgroundColor: '#F7F9FC', overflow: 'hidden', fontFamily: '"Inter", sans-serif' }} className="animate-fade-in">
+    <div style={{ padding: '1.5rem 2rem', minHeight: '100%', display: 'flex', flexDirection: 'column', gap: '1.5rem' }} className="animate-fade-in">
       {/* Header */}
-      <div style={{ height: '60px', padding: '0 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0, borderBottom: '1px solid #E5E7EB', backgroundColor: '#F7F9FC' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <SettingsIcon size={24} color="#2563EB" />
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: '12px' }}>
-            <h1 style={{ margin: 0, fontSize: '30px', fontWeight: 600, color: '#111827', lineHeight: 1 }}>System Settings</h1>
-            <p style={{ margin: 0, fontSize: '14px', color: '#6B7280' }}>Configure Enterprise VMS parameters</p>
-          </div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
+        <div>
+          <h1 style={{ margin: 0, fontSize: '24px', fontWeight: 700, color: 'var(--text-primary)' }}>System Settings</h1>
+          <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-secondary)' }}>Manage company configuration, departments, and visitor permissions</p>
         </div>
-        <button 
-          onClick={handleSave}
-          style={{ height: '40px', width: '140px', borderRadius: '10px', background: '#2563EB', color: '#FFFFFF', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontSize: '14px', fontWeight: 500, cursor: 'pointer', boxShadow: '0 2px 6px rgba(37,99,235,0.2)' }}
-        >
-          <Save size={16} /> Save Changes
+        <button className="ui-button ui-button-primary" onClick={handleSaveProfile} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <Save size={16} /> Save Profile
         </button>
       </div>
 
-      {/* Main Content Grid */}
-      <div style={{ flex: 1, padding: '16px 24px', display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gridTemplateRows: 'minmax(0, 1fr) minmax(0, 1fr)', gap: '12px', overflow: 'hidden' }}>
-        
-        {/* Company Profile */}
-        <div style={cardStyle}>
-          <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 600, color: '#111827', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Building size={20} color="#2563EB" /> Company Profile
-          </h2>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            <div>
-              <label style={{ display: 'block', fontSize: '13px', color: '#6B7280', marginBottom: '4px', fontWeight: 500 }}>Company Name</label>
-              <input 
-                style={inputStyle}
-                value={localSettings.companyName} 
-                onChange={(e) => setLocalSettings(prev => ({...prev, companyName: e.target.value}))} 
+      {/* 2-Column Responsive Grid */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(380px, 1fr))', gap: '1.5rem', alignItems: 'start' }}>
+
+        {/* Left Column: Company Profile & Visitor Purposes */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+
+          {/* Company Profile Card */}
+          <div className="ui-card" style={{ padding: '20px' }}>
+            <div style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <Building size={20} color="var(--primary-color)" /> Company Profile
+            </div>
+            <div className="ui-form-group" style={{ marginBottom: '14px' }}>
+              <label className="ui-form-label">Company Name</label>
+              <input
+                className="ui-input"
+                value={companyName}
+                onChange={(e) => setCompanyName(e.target.value)}
+                placeholder="Enter company name..."
               />
             </div>
-            <div>
-              <label style={{ display: 'block', fontSize: '13px', color: '#6B7280', marginBottom: '4px', fontWeight: 500 }}>Max Meeting Duration (Hours)</label>
-              <input 
+            <div className="ui-form-group" style={{ margin: 0 }}>
+              <label className="ui-form-label">Max Visit Duration (Hours)</label>
+              <input
                 type="number"
-                style={inputStyle}
-                value={localSettings.meetingDurationMaxHours} 
-                onChange={(e) => setLocalSettings(prev => ({...prev, meetingDurationMaxHours: parseInt(e.target.value) || 4}))} 
+                min="1"
+                max="24"
+                className="ui-input"
+                value={maxHours}
+                onChange={(e) => setMaxHours(parseInt(e.target.value) || 4)}
               />
-              <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: '#6B7280' }}>Visitors inside longer than this will be marked as overdue.</p>
             </div>
           </div>
+
+          {/* Visitor Purposes Card */}
+          <div className="ui-card" style={{ padding: '20px', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <ShieldCheck size={20} color="var(--primary-color)" /> Visitor Purposes
+            </div>
+            <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: '0 0 14px 0' }}>
+              Selectable visit reasons available on the registration portal.
+            </p>
+
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '14px' }}>
+              <input
+                className="ui-input"
+                value={newPurpose}
+                onChange={e => setNewPurpose(e.target.value)}
+                placeholder="Add visitor purpose..."
+                onKeyDown={e => e.key === 'Enter' && addPurpose()}
+                style={{ flex: 1 }}
+              />
+              <button className="ui-button ui-button-primary" onClick={addPurpose} style={{ padding: '0 14px' }}>
+                <Plus size={16} />
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '420px', overflowY: 'auto', paddingRight: '2px' }}>
+              {settings.visitorPurposes.length === 0 && (
+                <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px', padding: '1.5rem 0' }}>
+                  No visitor purposes defined yet. Add one above.
+                </div>
+              )}
+              {settings.visitorPurposes.map((purpose, idx) => (
+                <div key={idx} style={{ minHeight: '48px', borderRadius: '8px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-main)', display: 'flex', alignItems: 'center', padding: '0 14px', justifyContent: 'space-between', flexShrink: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <div style={{ width: '28px', height: '28px', borderRadius: '6px', backgroundColor: 'var(--bg-primary-light)', color: 'var(--primary-color)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <Tag size={14} />
+                    </div>
+                    <span style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-primary)' }}>{purpose}</span>
+                  </div>
+                  <button className="ui-button ui-button-danger ui-button-sm" onClick={() => removePurpose(idx)} style={{ padding: '4px 8px' }}>
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+
         </div>
 
-        {/* Department Management */}
-        <div style={cardStyle}>
-          <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 600, color: '#111827', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Building size={20} color="#2563EB" /> Department Management
-          </h2>
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <input style={inputStyle} value={newDept} onChange={e => setNewDept(e.target.value)} placeholder="New department..." onKeyDown={e => e.key === 'Enter' && addItem('departments', newDept, setNewDept)} />
-            <button style={addBtnStyle} onClick={() => addItem('departments', newDept, setNewDept)}><Plus size={18} /></button>
-          </div>
-          <div style={listContainerStyle}>
-            {localSettings.departments.map((dept, idx) => (
-              <div key={idx} style={listItemStyle}>
-                <div style={listIconStyle}><Building size={16} color="#FFFFFF" /></div>
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                  <div style={listTitleStyle}>{dept}</div>
-                  <div style={listSubtitleStyle}>Standard Department</div>
-                </div>
-                <button style={delBtnStyle} onClick={() => removeItem('departments', idx)}><Trash2 size={16} /></button>
-              </div>
-            ))}
-          </div>
-        </div>
+        {/* Right Column: Department Management */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
 
-        {/* Employees */}
-        <div style={cardStyle}>
-          <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 600, color: '#111827', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Users size={20} color="#2563EB" /> Employees Directory
-          </h2>
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <input style={inputStyle} value={newEmployee} onChange={e => setNewEmployee(e.target.value)} placeholder="New employee..." onKeyDown={e => e.key === 'Enter' && addItem('employees', newEmployee, setNewEmployee)} />
-            <button style={addBtnStyle} onClick={() => addItem('employees', newEmployee, setNewEmployee)}><Plus size={18} /></button>
-          </div>
-          <div style={listContainerStyle}>
-            {localSettings.employees.map((emp, idx) => (
-              <div key={idx} style={listItemStyle}>
-                <div style={listIconStyle}><Users size={16} color="#FFFFFF" /></div>
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                  <div style={listTitleStyle}>{emp}</div>
-                  <div style={listSubtitleStyle}>Active Employee</div>
-                </div>
-                <button style={delBtnStyle} onClick={() => removeItem('employees', idx)}><Trash2 size={16} /></button>
-              </div>
-            ))}
-          </div>
-        </div>
+          <div className="ui-card" style={{ padding: '20px', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <Building size={20} color="var(--primary-color)" /> Department Management
+            </div>
+            <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: '0 0 14px 0' }}>
+              Single master list used across Registration, User Management, and all system modules.
+            </p>
 
-        {/* Visitor Purposes */}
-        <div style={cardStyle}>
-          <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 600, color: '#111827', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <ShieldCheck size={20} color="#2563EB" /> Visitor Purposes
-          </h2>
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <input style={inputStyle} value={newPurpose} onChange={e => setNewPurpose(e.target.value)} placeholder="New purpose..." onKeyDown={e => e.key === 'Enter' && addItem('visitorPurposes', newPurpose, setNewPurpose)} />
-            <button style={addBtnStyle} onClick={() => addItem('visitorPurposes', newPurpose, setNewPurpose)}><Plus size={18} /></button>
-          </div>
-          <div style={listContainerStyle}>
-            {localSettings.visitorPurposes.map((purpose, idx) => (
-              <div key={idx} style={listItemStyle}>
-                <div style={listIconStyle}><ShieldCheck size={16} color="#FFFFFF" /></div>
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                  <div style={listTitleStyle}>{purpose}</div>
-                  <div style={listSubtitleStyle}>Registered Purpose</div>
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '14px' }}>
+              <input
+                className="ui-input"
+                value={newDept}
+                onChange={e => setNewDept(e.target.value)}
+                placeholder="Add department name..."
+                onKeyDown={e => e.key === 'Enter' && addDepartment()}
+                style={{ flex: 1 }}
+              />
+              <button className="ui-button ui-button-primary" onClick={addDepartment} style={{ padding: '0 14px' }}>
+                <Plus size={16} />
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '580px', overflowY: 'auto', paddingRight: '2px' }}>
+              {settings.departments.length === 0 && (
+                <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px', padding: '2rem 0' }}>
+                  No departments found. Add your first department above.
                 </div>
-                <button style={delBtnStyle} onClick={() => removeItem('visitorPurposes', idx)}><Trash2 size={16} /></button>
-              </div>
-            ))}
+              )}
+              {settings.departments.map((dept, idx) => {
+                const userCount = users.filter(u => u.department === dept).length;
+                return (
+                  <div key={idx} style={{ minHeight: '52px', borderRadius: '8px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-main)', display: 'flex', alignItems: 'center', padding: '0 14px', justifyContent: 'space-between', flexShrink: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <div style={{ width: '30px', height: '30px', borderRadius: '6px', backgroundColor: 'var(--bg-primary-light)', color: 'var(--primary-color)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <Building size={15} />
+                      </div>
+                      <div>
+                        <span style={{ fontSize: '14px', fontWeight: 500, color: 'var(--text-primary)' }}>{dept}</span>
+                        {userCount > 0 && (
+                          <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginLeft: '8px', backgroundColor: 'var(--bg-card)', padding: '2px 6px', borderRadius: '4px', border: '1px solid var(--border-color)' }}>
+                            {userCount} user{userCount > 1 ? 's' : ''}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <button
+                      className="ui-button ui-button-danger ui-button-sm"
+                      onClick={() => removeDepartment(dept)}
+                      style={{ padding: '4px 8px' }}
+                      title={userCount > 0 ? `${userCount} user(s) assigned — delete protected` : 'Delete department'}
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
           </div>
+
+          {/* Security Officers Master Card */}
+          <div className="ui-card" style={{ padding: '20px', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <Shield size={20} color="var(--primary-color)" /> Security Officers Master
+            </div>
+            <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: '0 0 14px 0' }}>
+              Authorized Security Officers list for On-Duty shift login and visitor audit tracking.
+            </p>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: '8px', marginBottom: '14px' }}>
+              <input
+                className="ui-input"
+                value={newOfficerName}
+                onChange={e => setNewOfficerName(e.target.value)}
+                placeholder="Officer Name (e.g. Amit Singh)..."
+              />
+              <input
+                className="ui-input"
+                value={newOfficerBadge}
+                onChange={e => setNewOfficerBadge(e.target.value)}
+                placeholder="Badge No. (Optional)..."
+              />
+              <button className="ui-button ui-button-primary" onClick={handleAddOfficer} style={{ padding: '0 14px' }}>
+                <Plus size={16} /> Add
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '360px', overflowY: 'auto', paddingRight: '2px' }}>
+              {officers.length === 0 && (
+                <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px', padding: '1.5rem 0' }}>
+                  No security officers defined. Add your first officer above.
+                </div>
+              )}
+              {officers.map(officer => (
+                <div key={officer.id} style={{ minHeight: '52px', borderRadius: '8px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-main)', display: 'flex', alignItems: 'center', padding: '0 14px', justifyContent: 'space-between', flexShrink: 0, opacity: officer.isActive ? 1 : 0.6 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <div style={{ width: '30px', height: '30px', borderRadius: '6px', backgroundColor: officer.isActive ? '#DBEAFE' : '#F1F5F9', color: officer.isActive ? '#1D4ED8' : '#94A3B8', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <User size={15} />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        {officer.name}
+                        {officer.badgeNumber && <span style={{ fontSize: '11px', backgroundColor: 'var(--bg-card)', padding: '1px 5px', borderRadius: '4px', border: '1px solid var(--border-color)', color: 'var(--text-muted)' }}>{officer.badgeNumber}</span>}
+                      </div>
+                      <span style={{ fontSize: '11px', color: officer.isActive ? '#10B981' : '#EF4444', fontWeight: 600 }}>
+                        {officer.isActive ? '● Active' : '○ Disabled'}
+                      </span>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    <button
+                      className="ui-button ui-button-secondary ui-button-sm"
+                      onClick={() => toggleOfficerActive(officer.id)}
+                      title={officer.isActive ? 'Disable Officer' : 'Enable Officer'}
+                      style={{ padding: '4px 8px' }}
+                    >
+                      <Power size={14} color={officer.isActive ? '#10B981' : '#94A3B8'} />
+                    </button>
+                    <button
+                      className="ui-button ui-button-danger ui-button-sm"
+                      onClick={() => {
+                        if (window.confirm(`Delete officer "${officer.name}"?`)) {
+                          deleteOfficer(officer.id);
+                          toast(`Officer "${officer.name}" deleted.`, 'success');
+                        }
+                      }}
+                      style={{ padding: '4px 8px' }}
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
         </div>
 
       </div>

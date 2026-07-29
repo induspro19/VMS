@@ -1,43 +1,54 @@
 /* src/css/forms.css */
 .ui-form-group {
-  position: relative;
-  margin-bottom: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-bottom: 0.75rem;
 }
 
-.ui-input {
-  width: 100%;
-  height: 48px;
-  padding: 0 0.85rem;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--border-color);
-  background-color: var(--bg-input);
-  color: var(--text-primary);
-  font-size: 14px;
-  transition: all var(--transition-fast);
-}
-
-.ui-input:focus {
-  outline: none;
-  border-color: var(--primary-color);
-  box-shadow: 0 0 0 3px var(--bg-primary-light);
-}
-
-.ui-label-floating {
-  position: absolute;
-  left: 0.85rem;
-  top: 50%;
-  transform: translateY(-50%);
-  background-color: var(--bg-input);
-  padding: 0 0.25rem;
-  color: var(--text-muted);
-  font-size: 13px;
-  transition: all var(--transition-fast);
-  pointer-events: none;
-}
-
-.ui-input:focus ~ .ui-label-floating,
-.ui-input:not(:placeholder-shown) ~ .ui-label-floating {
-  top: 0;
+.ui-form-label {
   font-size: 12px;
-  color: var(--primary-color);
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.ui-input, .ui-select, .ui-textarea {
+  width: 100%;
+  height: 38px; /* Height 38px */
+  padding: 0 0.85rem;
+  border-radius: 10px; /* Radius 10px */
+  background-color: var(--bg-input);
+  border: 1px solid var(--border-color); /* Very light border */
+  color: var(--text-primary);
+  font-size: 13px;
+  outline: none;
+  transition: all var(--transition-fast);
+  box-sizing: border-box;
+}
+
+.ui-input::placeholder, .ui-textarea::placeholder {
+  color: var(--text-muted);
+  font-size: 13px; /* Placeholder 13px */
+}
+
+.ui-input:focus, .ui-select:focus, .ui-textarea:focus {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 2px var(--bg-primary-light); /* Blue focus outline */
+}
+
+.ui-textarea {
+  height: auto;
+  min-height: 70px;
+  padding: 0.6rem 0.85rem;
+  resize: vertical;
+}
+
+.ui-form-row {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px; /* Compact 12px spacing */
+}
+
+.ui-form-row-full {
+  grid-column: 1 / -1;
 }

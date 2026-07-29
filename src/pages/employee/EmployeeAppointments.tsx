@@ -1,15 +1,18 @@
 import React, { useState } from 'react';
 import { useVisitor } from '../../context/VisitorContext';
 import { useAuth } from '../../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { useToast } from '../../context/ToastContext';
-import { CalendarClock, Plus, X, Clock } from 'lucide-react';
+import { CalendarClock, Plus, X, Clock, Calendar, ArrowLeft } from 'lucide-react';
+import './EmployeeDashboard.css';
 
 export const EmployeeAppointments: React.FC = () => {
   const { visitors, preRegisterVisitor } = useVisitor();
   const { user } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'EXPECTED' | 'COMPLETED'>('EXPECTED');
@@ -17,14 +20,13 @@ export const EmployeeAppointments: React.FC = () => {
     name: '',
     mobile: '',
     company: '',
-    department: 'Sales', // Defaulting for employee
+    department: 'Sales',
     purpose: 'Meeting',
     expectedEntryTime: ''
   });
 
   const myAppointments = visitors.filter(v => (v.employeeToMeet === user?.name || user?.name === 'John Doe') && v.isPreRegistered);
-  
-  const expectedVisitors = myAppointments.filter(v => v.status === 'APPROVED'); // Approved and waiting to arrive
+  const expectedVisitors = myAppointments.filter(v => v.status === 'APPROVED');
   const completedAppointments = myAppointments.filter(v => v.status === 'COMPLETED');
 
   const handlePreRegister = (e: React.FormEvent) => {
@@ -45,161 +47,153 @@ export const EmployeeAppointments: React.FC = () => {
   };
 
   return (
-    <div className="animate-fade-in" style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+    <div className="animate-fade-in" style={{ height: '100%', display: 'flex', flexDirection: 'column', padding: '1rem', boxSizing: 'border-box', overflowY: 'auto' }}>
       
-      {/* Header Row */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexShrink: 0 }}>
-        <div>
-          <h1 style={{ fontSize: '24px', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <CalendarClock size={24} style={{ color: 'var(--primary-color)' }} />
-            Appointments
-          </h1>
-          <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
-            Manage your pre-registered expected visitors.
+      {/* Back Button + Header Row */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '10px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <button
+            className="mobile-back-btn"
+            onClick={() => navigate('/employee')}
+            title="Back to Dashboard"
+          >
+            <ArrowLeft size={18} />
+          </button>
+          <div>
+            <h1 style={{ fontSize: '17px', fontWeight: 600, margin: 0, display: 'flex', alignItems: 'center', gap: '6px', color: '#0F172A' }}>
+              <CalendarClock size={18} style={{ color: '#2563EB' }} />
+              Appointments
+            </h1>
+            <div style={{ fontSize: '12px', color: '#94A3B8', marginTop: '2px' }}>
+              Pre-registered expected visitors
+            </div>
           </div>
         </div>
-        <Button variant="primary" onClick={() => setIsModalOpen(true)} leftIcon={<Plus size={16} />} style={{ height: '36px', fontSize: '13px' }}>
-          Schedule Appointment
+        <Button 
+          variant="primary" 
+          onClick={() => setIsModalOpen(true)} 
+          leftIcon={<Plus size={16} />} 
+          style={{ height: '40px', fontSize: '13px', borderRadius: '10px' }}
+        >
+          + Schedule Appt
         </Button>
       </div>
 
-      {/* Top Toolbar */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexShrink: 0 }}>
-        <div style={{ display: 'flex', gap: '4px', backgroundColor: '#E5E7EB', padding: '4px', borderRadius: '8px' }}>
+      {/* Top Toolbar Tabs */}
+      <div style={{ display: 'flex', marginBottom: '16px' }}>
+        <div style={{ display: 'flex', gap: '4px', backgroundColor: '#E2E8F0', padding: '4px', borderRadius: '12px', width: '100%' }}>
           <button 
             onClick={() => setActiveTab('EXPECTED')}
-            style={{ padding: '6px 16px', fontSize: '13px', fontWeight: 500, borderRadius: '6px', border: 'none', cursor: 'pointer', backgroundColor: activeTab === 'EXPECTED' ? '#FFFFFF' : 'transparent', color: activeTab === 'EXPECTED' ? '#111827' : '#4B5563', boxShadow: activeTab === 'EXPECTED' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none', transition: 'all 0.2s' }}
+            style={{ 
+              flex: 1, padding: '8px 12px', fontSize: '13px', fontWeight: 600, borderRadius: '8px', border: 'none', cursor: 'pointer',
+              backgroundColor: activeTab === 'EXPECTED' ? '#FFFFFF' : 'transparent',
+              color: activeTab === 'EXPECTED' ? '#0F172A' : '#64748B',
+              boxShadow: activeTab === 'EXPECTED' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+              transition: 'all 0.2s'
+            }}
           >
-            Expected Visitors ({expectedVisitors.length})
+            Expected ({expectedVisitors.length})
           </button>
           <button 
             onClick={() => setActiveTab('COMPLETED')}
-            style={{ padding: '6px 16px', fontSize: '13px', fontWeight: 500, borderRadius: '6px', border: 'none', cursor: 'pointer', backgroundColor: activeTab === 'COMPLETED' ? '#FFFFFF' : 'transparent', color: activeTab === 'COMPLETED' ? '#111827' : '#4B5563', boxShadow: activeTab === 'COMPLETED' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none', transition: 'all 0.2s' }}
+            style={{ 
+              flex: 1, padding: '8px 12px', fontSize: '13px', fontWeight: 600, borderRadius: '8px', border: 'none', cursor: 'pointer',
+              backgroundColor: activeTab === 'COMPLETED' ? '#FFFFFF' : 'transparent',
+              color: activeTab === 'COMPLETED' ? '#0F172A' : '#64748B',
+              boxShadow: activeTab === 'COMPLETED' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+              transition: 'all 0.2s'
+            }}
           >
-            Completed Appointments
+            History ({completedAppointments.length})
           </button>
         </div>
       </div>
 
-      {/* Main Table Area */}
-      <div className="ui-card" style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
-        <div style={{ padding: '0.75rem 1rem', borderBottom: '1px solid var(--border-color)', backgroundColor: 'var(--bg-card-hover)', fontWeight: 600, fontSize: '14px', flexShrink: 0 }}>
-          {activeTab === 'EXPECTED' ? 'Upcoming Appointments' : 'Appointment History'}
-        </div>
-        
-        <div style={{ flex: 1, overflowY: 'auto' }}>
-          <table className="ui-table" style={{ margin: 0, width: '100%' }}>
-            <thead>
-              <tr>
-                <th style={{ padding: '0.5rem 1rem' }}>Visitor Details</th>
-                <th style={{ padding: '0.5rem 1rem' }}>Company</th>
-                <th style={{ padding: '0.5rem 1rem' }}>Date & Time</th>
-                <th style={{ padding: '0.5rem 1rem' }}>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {activeTab === 'EXPECTED' ? (
-                <>
-                  {expectedVisitors.length === 0 && (
-                    <tr>
-                      <td colSpan={4} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
-                        No upcoming appointments.
-                      </td>
-                    </tr>
-                  )}
-                  {expectedVisitors.map(v => (
-                    <tr key={v.id}>
-                      <td>
-                        <div style={{ fontWeight: 500 }}>{v.name}</div>
-                        <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Mobile: {v.mobile}</div>
-                      </td>
-                      <td>
-                        <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>{v.company || '-'}</div>
-                      </td>
-                      <td>
-                        <div style={{ fontSize: '13px', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                          <Clock size={12} />
-                          {new Date(v.expectedEntryTime!).toLocaleString()}
-                        </div>
-                      </td>
-                      <td><Badge variant="warning">Awaiting Arrival</Badge></td>
-                    </tr>
-                  ))}
-                </>
-              ) : (
-                <>
-                  {completedAppointments.length === 0 && (
-                    <tr>
-                      <td colSpan={4} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
-                        No history found.
-                      </td>
-                    </tr>
-                  )}
-                  {completedAppointments.map(v => (
-                    <tr key={v.id}>
-                      <td>
-                        <div style={{ fontWeight: 500 }}>{v.name}</div>
-                        <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{v.purpose}</div>
-                      </td>
-                      <td>
-                        <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>{v.company || '-'}</div>
-                      </td>
-                      <td>
-                        <div style={{ fontSize: '13px', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                          <Clock size={12} />
-                          {new Date(v.entryTime!).toLocaleDateString()}
-                        </div>
-                      </td>
-                      <td><Badge variant="default">Completed</Badge></td>
-                    </tr>
-                  ))}
-                </>
-              )}
-            </tbody>
-          </table>
-        </div>
+      {/* Mobile Card Feed */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', flex: 1 }}>
+        {activeTab === 'EXPECTED' ? (
+          <>
+            {expectedVisitors.length === 0 ? (
+              <div style={{ backgroundColor: '#FFFFFF', borderRadius: '16px', border: '1px solid #E2E8F0', padding: '32px 16px', textAlign: 'center', color: '#64748B', fontSize: '14px' }}>
+                <Calendar size={32} color="#94A3B8" style={{ marginBottom: '8px' }} />
+                <div>No upcoming appointments scheduled.</div>
+              </div>
+            ) : (
+              expectedVisitors.map(v => (
+                <div key={v.id} style={{ backgroundColor: '#FFFFFF', borderRadius: '16px', border: '1px solid #E2E8F0', padding: '16px', display: 'flex', flexDirection: 'column', gap: '8px', boxShadow: '0 2px 6px rgba(0,0,0,0.03)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ fontSize: '15px', fontWeight: 700, color: '#0F172A' }}>👤 {v.name}</div>
+                    <Badge variant="warning">APPROVED</Badge>
+                  </div>
+                  <div style={{ fontSize: '13px', color: '#64748B' }}>🏢 {v.company || 'Independent'} • {v.purpose}</div>
+                  <div style={{ fontSize: '12px', color: '#2563EB', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <Clock size={14} /> Expected: {v.expectedEntryTime ? new Date(v.expectedEntryTime).toLocaleString() : 'Today'}
+                  </div>
+                </div>
+              ))
+            )}
+          </>
+        ) : (
+          <>
+            {completedAppointments.length === 0 ? (
+              <div style={{ backgroundColor: '#FFFFFF', borderRadius: '16px', border: '1px solid #E2E8F0', padding: '32px 16px', textAlign: 'center', color: '#64748B', fontSize: '14px' }}>
+                <div>No completed appointment history.</div>
+              </div>
+            ) : (
+              completedAppointments.map(v => (
+                <div key={v.id} style={{ backgroundColor: '#FFFFFF', borderRadius: '16px', border: '1px solid #E2E8F0', padding: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ fontSize: '15px', fontWeight: 700, color: '#0F172A' }}>{v.name}</div>
+                    <Badge variant="default">Completed</Badge>
+                  </div>
+                  <div style={{ fontSize: '13px', color: '#64748B' }}>{v.company || 'N/A'} • {v.purpose}</div>
+                </div>
+              ))
+            )}
+          </>
+        )}
       </div>
 
+      {/* Schedule Appointment Responsive Modal */}
       {isModalOpen && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(17, 24, 39, 0.4)', backdropFilter: 'blur(4px)' }}>
-          <div className="ui-card" style={{ width: '100%', maxWidth: '500px', display: 'flex', flexDirection: 'column', maxHeight: '90vh' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 1.25rem', borderBottom: '1px solid var(--border-color)' }}>
-              <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 600 }}>Schedule Appointment</h2>
-              <button onClick={() => setIsModalOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9CA3AF' }}><X size={20}/></button>
+        <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(15, 23, 42, 0.5)', backdropFilter: 'blur(4px)', padding: '16px' }}>
+          <div style={{ backgroundColor: '#FFFFFF', width: '100%', maxWidth: '440px', borderRadius: '20px', display: 'flex', flexDirection: 'column', maxHeight: '90vh', overflow: 'hidden', boxShadow: '0 10px 30px rgba(0,0,0,0.2)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', borderBottom: '1px solid #E2E8F0' }}>
+              <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: '#0F172A' }}>Schedule Appointment</h2>
+              <button onClick={() => setIsModalOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8' }}><X size={20}/></button>
             </div>
             
             <form onSubmit={handlePreRegister} style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-              <div style={{ padding: '1.25rem', overflowY: 'auto' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', gridColumn: 'span 2' }}>
-                    <label style={{ fontSize: '13px', fontWeight: 500, color: '#374151' }}>Visitor Name *</label>
-                    <input type="text" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} required style={{ height: '36px', padding: '0 12px', fontSize: '13px', borderRadius: '6px', border: '1px solid #D1D5DB', outline: 'none' }} placeholder="John Doe" />
-                  </div>
-                  
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    <label style={{ fontSize: '13px', fontWeight: 500, color: '#374151' }}>Mobile Number *</label>
-                    <input type="tel" value={formData.mobile} onChange={e => setFormData({...formData, mobile: e.target.value})} required style={{ height: '36px', padding: '0 12px', fontSize: '13px', borderRadius: '6px', border: '1px solid #D1D5DB', outline: 'none' }} placeholder="+1 (555) 000-0000" />
-                  </div>
-                  
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    <label style={{ fontSize: '13px', fontWeight: 500, color: '#374151' }}>Company</label>
-                    <input type="text" value={formData.company} onChange={e => setFormData({...formData, company: e.target.value})} style={{ height: '36px', padding: '0 12px', fontSize: '13px', borderRadius: '6px', border: '1px solid #D1D5DB', outline: 'none' }} placeholder="Acme Corp" />
-                  </div>
-                  
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', gridColumn: 'span 2' }}>
-                    <label style={{ fontSize: '13px', fontWeight: 500, color: '#374151' }}>Purpose</label>
-                    <input type="text" value={formData.purpose} onChange={e => setFormData({...formData, purpose: e.target.value})} style={{ height: '36px', padding: '0 12px', fontSize: '13px', borderRadius: '6px', border: '1px solid #D1D5DB', outline: 'none' }} placeholder="Meeting" />
-                  </div>
-                  
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', gridColumn: 'span 2' }}>
-                    <label style={{ fontSize: '13px', fontWeight: 500, color: '#374151' }}>Expected Date & Time *</label>
-                    <input type="datetime-local" value={formData.expectedEntryTime} onChange={e => setFormData({...formData, expectedEntryTime: e.target.value})} required style={{ height: '36px', padding: '0 12px', fontSize: '13px', borderRadius: '6px', border: '1px solid #D1D5DB', outline: 'none' }} />
-                  </div>
+              <div style={{ padding: '20px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <label style={{ fontSize: '13px', fontWeight: 600, color: '#334155' }}>Visitor Name *</label>
+                  <input type="text" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} required style={{ height: '44px', padding: '0 14px', fontSize: '14px', borderRadius: '12px', border: '1px solid #CBD5E1', outline: 'none' }} placeholder="e.g. Rahul Sharma" />
+                </div>
+                
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <label style={{ fontSize: '13px', fontWeight: 600, color: '#334155' }}>Mobile Number *</label>
+                  <input type="tel" value={formData.mobile} onChange={e => setFormData({...formData, mobile: e.target.value})} required style={{ height: '44px', padding: '0 14px', fontSize: '14px', borderRadius: '12px', border: '1px solid #CBD5E1', outline: 'none' }} placeholder="9876543210" />
+                </div>
+                
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <label style={{ fontSize: '13px', fontWeight: 600, color: '#334155' }}>Company Name</label>
+                  <input type="text" value={formData.company} onChange={e => setFormData({...formData, company: e.target.value})} style={{ height: '44px', padding: '0 14px', fontSize: '14px', borderRadius: '12px', border: '1px solid #CBD5E1', outline: 'none' }} placeholder="Acme Corp" />
+                </div>
+                
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <label style={{ fontSize: '13px', fontWeight: 600, color: '#334155' }}>Purpose</label>
+                  <input type="text" value={formData.purpose} onChange={e => setFormData({...formData, purpose: e.target.value})} style={{ height: '44px', padding: '0 14px', fontSize: '14px', borderRadius: '12px', border: '1px solid #CBD5E1', outline: 'none' }} placeholder="Business Meeting" />
+                </div>
+                
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <label style={{ fontSize: '13px', fontWeight: 600, color: '#334155' }}>Expected Date & Time *</label>
+                  <input type="datetime-local" value={formData.expectedEntryTime} onChange={e => setFormData({...formData, expectedEntryTime: e.target.value})} required style={{ height: '44px', padding: '0 14px', fontSize: '14px', borderRadius: '12px', border: '1px solid #CBD5E1', outline: 'none' }} />
                 </div>
               </div>
-              <div style={{ padding: '1rem 1.25rem', borderTop: '1px solid var(--border-color)', display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', backgroundColor: '#F9FAFB' }}>
-                <Button variant="secondary" onClick={() => setIsModalOpen(false)} type="button">Cancel</Button>
-                <Button variant="primary" type="submit">Schedule Appointment</Button>
+
+              <div style={{ padding: '16px 20px', borderTop: '1px solid #E2E8F0', display: 'flex', justifyContent: 'flex-end', gap: '12px', backgroundColor: '#F8FAFC' }}>
+                <Button variant="secondary" onClick={() => setIsModalOpen(false)} type="button" style={{ height: '40px', borderRadius: '10px' }}>Cancel</Button>
+                <Button variant="primary" type="submit" style={{ height: '40px', borderRadius: '10px' }}>Schedule Appointment</Button>
               </div>
             </form>
           </div>

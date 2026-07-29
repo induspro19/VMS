@@ -1,40 +1,42 @@
 /* src/css/buttons.css */
 .ui-button {
+  height: 36px; /* Height 36px */
+  padding: 0 1rem;
+  border-radius: 10px; /* Radius 10px */
+  font-size: 13px; /* Buttons 13px */
+  font-weight: 500;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  padding: 0.5rem 1rem;
-  font-weight: 500;
-  font-size: 13px;
-  border-radius: var(--radius-md);
-  border: none;
   cursor: pointer;
   transition: all var(--transition-fast);
-  position: relative;
-  overflow: hidden;
+  border: 1px solid transparent;
+  outline: none;
+  white-space: nowrap;
 }
 
-.ui-button:active {
-  transform: scale(0.97);
+.ui-button svg {
+  width: 16px;
+  height: 16px;
 }
 
 .ui-button-primary {
   background-color: var(--primary-color);
-  color: white;
-  box-shadow: var(--shadow-sm);
+  color: #FFFFFF;
+  border-color: var(--primary-color);
 }
 
 .ui-button-primary:hover {
   background-color: var(--primary-hover);
-  box-shadow: var(--shadow-md);
+  border-color: var(--primary-hover);
   transform: translateY(-1px);
 }
 
 .ui-button-secondary {
-  background-color: var(--bg-input);
+  background-color: var(--bg-card);
   color: var(--text-primary);
-  border: 1px solid var(--border-color);
+  border-color: var(--border-color);
 }
 
 .ui-button-secondary:hover {
@@ -42,32 +44,34 @@
   border-color: var(--border-color-hover);
 }
 
+.ui-button-danger {
+  background-color: transparent;
+  color: var(--danger-color);
+  border-color: var(--danger-color); /* Danger red outline */
+}
+
+.ui-button-danger:hover {
+  background-color: var(--bg-danger-light);
+}
+
 .ui-button-success {
   background-color: var(--success-color);
-  color: white;
+  color: #FFFFFF;
 }
+
 .ui-button-success:hover {
-  filter: brightness(1.1);
+  background-color: #059669;
 }
 
-.ui-button-danger {
-  background-color: var(--danger-color);
-  color: white;
-}
-.ui-button-danger:hover {
-  filter: brightness(1.1);
-}
-
-.ui-button-outline {
-  background-color: transparent;
-  color: var(--primary-color);
-  border: 1px solid var(--primary-color);
-}
-.ui-button-outline:hover {
-  background-color: var(--bg-primary-light);
+.ui-button-sm {
+  height: 30px;
+  padding: 0 0.75rem;
+  font-size: 12px;
+  border-radius: 8px;
 }
 
-.ui-button-icon {
-  padding: 0.6rem;
-  border-radius: var(--radius-full);
+.ui-button-lg {
+  height: 40px;
+  padding: 0 1.25rem;
+  font-size: 14px;
 }

@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useVisitor } from '../../context/VisitorContext';
 import { useNotification } from '../../context/NotificationContext';
+import { useAppUsers } from '../../context/UserContext';
 import { 
   ShieldCheck, CheckCircle, ArrowLeft, Sun, Globe, Clock,
   Phone, User, Building, Mail, Network, FileText, UserSquare, Car, 
@@ -13,6 +14,7 @@ import './RegisterPortal.css';
 export const RegisterPortal: React.FC = () => {
   const { registerVisitor, getVisitorHistory } = useVisitor();
   const { sendPush } = useNotification();
+  const { users } = useAppUsers();
   const navigate = useNavigate();
   
   const [submitted, setSubmitted] = useState(false);
@@ -26,11 +28,11 @@ export const RegisterPortal: React.FC = () => {
     company: '',
     department: '',
     employeeToMeet: '',
+    hostEmployeeId: '',
     purpose: '',
   });
 
   const mobileInputRef = useRef<HTMLInputElement>(null);
-
   useEffect(() => {
     // Auto-focus the first field on load
     if (mobileInputRef.current) {
@@ -41,7 +43,17 @@ export const RegisterPortal: React.FC = () => {
   }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
+    if (e.target.name === 'hostEmployeeId') {
+      const selectedId = e.target.value;
+      const selectedUser = users.find(u => u.id === selectedId);
+      setFormData(prev => ({
+        ...prev,
+        hostEmployeeId: selectedId,
+        employeeToMeet: selectedUser ? selectedUser.name : ''
+      }));
+    } else {
+      setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
+    }
     setError(null); // Clear error on typing
   };
 
@@ -56,6 +68,7 @@ export const RegisterPortal: React.FC = () => {
           company: prev.company || lastVisit.company,
           department: prev.department || lastVisit.department,
           employeeToMeet: prev.employeeToMeet || lastVisit.employeeToMeet,
+          hostEmployeeId: prev.hostEmployeeId || lastVisit.hostEmployeeId || '',
           purpose: prev.purpose || lastVisit.purpose,
         }));
         setIsAutoFilled(true);
@@ -70,6 +83,7 @@ export const RegisterPortal: React.FC = () => {
       company: '',
       department: '',
       employeeToMeet: '',
+      hostEmployeeId: '',
       purpose: '',
     });
     setIsAutoFilled(false);
@@ -79,7 +93,7 @@ export const RegisterPortal: React.FC = () => {
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name || !formData.mobile || !formData.employeeToMeet) {
       setError('Please fill in all required fields.');
@@ -92,7 +106,7 @@ export const RegisterPortal: React.FC = () => {
     }
 
     try {
-      registerVisitor(formData);
+      await registerVisitor(formData);
       
       // Simulate notification to employee
       sendPush(
@@ -261,10 +275,11 @@ export const RegisterPortal: React.FC = () => {
               <div className="kiosk-input-wrapper">
                 <div className="kiosk-input-icon"><User size={18} /></div>
                 <div className="kiosk-select-wrapper">
-                  <select name="employeeToMeet" value={formData.employeeToMeet} onChange={handleChange} required>
+                  <select name="hostEmployeeId" value={formData.hostEmployeeId} onChange={handleChange} required>
                     <option value="" disabled hidden>Select host employee</option>
-                    <option value="John Smith">John Smith</option>
-                    <option value="Sarah Jane">Sarah Jane</option>
+                    {users.filter(u => u.role === 'EMPLOYEE' || u.role === 'ADMIN' || u.role === 'HR').map(emp => (
+                      <option key={emp.id} value={emp.id}>{emp.name} ({emp.department})</option>
+                    ))}
                   </select>
                   <ChevronDown size={16} className="kiosk-select-icon" />
                 </div>

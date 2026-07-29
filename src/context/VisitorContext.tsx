@@ -30,6 +30,7 @@ export interface Visitor {
   company: string;
   department: string;
   employeeToMeet: string;
+  hostEmployeeId?: string;
   purpose: string;
   vehicleNumber?: string;
   status: VisitorStatus;
@@ -50,6 +51,11 @@ export interface Visitor {
   meetingCompleted?: boolean;
   readyForExit?: boolean;
   meetingCompletedTime?: string;
+  checkedInBy?: string;
+  checkedOutBy?: string;
+  totalVisitDuration?: string;
+  whatsappSent?: boolean;
+  whatsappSentTime?: string;
   gateId?: string;
   sessionId?: string;
   registrationMetadata?: {
@@ -80,9 +86,25 @@ interface VisitorContextType {
   registerVisitor: (data: Omit<Visitor, 'id' | 'status' | 'registrationTime'>) => Promise<string> | string;
   preRegisterVisitor: (data: Omit<Visitor, 'id' | 'status' | 'registrationTime' | 'isPreRegistered'>) => Promise<string> | string;
   updateStatus: (id: string, status: VisitorStatus, actor: string, extra?: Partial<Visitor>, isForceExit?: boolean) => void;
-  getVisitorByToken: (token: string) => Visitor | undefined;
+  getVisitorById: (id: string) => Visitor | undefined;
   getVisitorHistory: (mobile: string) => Visitor[];
 }
+
+export const setVisitorSession = (visitorId: string, sessionId: string) => {
+  localStorage.setItem('activeVisitorId', visitorId);
+  localStorage.setItem('activeSessionId', sessionId);
+};
+
+export const getVisitorSession = () => {
+  const visitorId = localStorage.getItem('activeVisitorId');
+  const sessionId = localStorage.getItem('activeSessionId');
+  return visitorId && sessionId ? { visitorId, sessionId } : null;
+};
+
+export const clearVisitorSession = () => {
+  localStorage.removeItem('activeVisitorId');
+  localStorage.removeItem('activeSessionId');
+};
 
 const VisitorContext = createContext<VisitorContextType | undefined>(undefined);
 
@@ -98,39 +120,50 @@ const getBrowserMetadata = () => {
   };
 };
 
-const mapDbToVisitor = (db: any): Visitor => ({
-  id: db.id,
-  name: db.name || '',
-  mobile: db.mobile || '',
-  company: db.company || '',
-  department: db.department || '',
-  employeeToMeet: db.employee_to_meet || db.employeeToMeet || '',
-  purpose: db.purpose || '',
-  vehicleNumber: db.vehicle_number || db.vehicleNumber,
-  status: db.status as VisitorStatus,
-  registrationTime: db.registration_time || db.registrationTime || new Date().toISOString(),
-  entryTime: db.entry_time || db.entryTime,
-  exitTime: db.exit_time || db.exitTime,
-  checkoutToken: db.checkout_token || db.checkoutToken,
-  isOverride: db.is_override ?? db.isOverride,
-  overrideReason: db.override_reason || db.overrideReason,
-  overrideTime: db.override_time || db.overrideTime,
-  overrideBy: db.override_by || db.overrideBy,
-  isPreRegistered: db.is_pre_registered ?? db.isPreRegistered,
-  expectedEntryTime: db.expected_entry_time || db.expectedEntryTime,
-  deviceId: db.device_id || db.deviceId,
-  ipAddress: db.ip_address || db.ipAddress,
-  qrToken: db.qr_token || db.qrToken,
-  visitorType: db.visitor_type || db.visitorType,
-  meetingCompleted: db.meeting_completed ?? db.meetingCompleted,
-  readyForExit: db.ready_for_exit ?? db.readyForExit,
-  meetingCompletedTime: db.meeting_completed_time || db.meetingCompletedTime,
-  gateId: db.gate_id || db.gateId,
-  sessionId: db.session_id || db.sessionId,
-  registrationMetadata: db.registration_metadata || db.registrationMetadata,
-  checkoutMetadata: db.checkout_metadata || db.checkoutMetadata,
-  auditTimeline: db.audit_timeline || db.auditTimeline || [],
-});
+const mapDbToVisitor = (db: any): Visitor => {
+  const status = db.status as VisitorStatus;
+  console.log('Loaded status from Supabase:', db.id, db.status, 'ready_for_exit:', db.ready_for_exit);
+  const isCompleted = status === 'COMPLETED';
+  return {
+    id: db.id,
+    name: db.name || '',
+    mobile: db.mobile || '',
+    company: db.company || '',
+    department: db.department || '',
+    employeeToMeet: db.employee_to_meet || db.employeeToMeet || '',
+    hostEmployeeId: db.host_employee_id || db.hostEmployeeId,
+    purpose: db.purpose || '',
+    vehicleNumber: db.vehicle_number || db.vehicleNumber,
+    status: status,
+    registrationTime: db.registration_time || db.registrationTime || new Date().toISOString(),
+    entryTime: db.entry_time || db.entryTime,
+    exitTime: db.exit_time || db.exitTime,
+    checkoutToken: db.checkout_token || db.checkoutToken,
+    isOverride: db.is_override ?? db.isOverride,
+    overrideReason: db.override_reason || db.overrideReason,
+    overrideTime: db.override_time || db.overrideTime,
+    overrideBy: db.override_by || db.overrideBy,
+    isPreRegistered: db.is_pre_registered ?? db.isPreRegistered,
+    expectedEntryTime: db.expected_entry_time || db.expectedEntryTime,
+    deviceId: db.device_id || db.deviceId,
+    ipAddress: db.ip_address || db.ipAddress,
+    qrToken: db.qr_token || db.qrToken,
+    visitorType: db.visitor_type || db.visitorType,
+    meetingCompleted: isCompleted ? true : (db.meeting_completed ?? db.meetingCompleted),
+    readyForExit: isCompleted ? false : (db.ready_for_exit ?? db.readyForExit),
+    meetingCompletedTime: db.meeting_completed_time || db.meetingCompletedTime,
+    checkedInBy: db.checked_in_by || db.checkedInBy,
+    checkedOutBy: db.checked_out_by || db.checkedOutBy,
+    totalVisitDuration: db.total_visit_duration || db.totalVisitDuration,
+    whatsappSent: db.whatsapp_sent ?? db.whatsappSent,
+    whatsappSentTime: db.whatsapp_sent_time || db.whatsappSentTime,
+    gateId: db.gate_id || db.gateId,
+    sessionId: db.session_id || db.sessionId,
+    registrationMetadata: db.registration_metadata || db.registrationMetadata,
+    checkoutMetadata: db.checkout_metadata || db.checkoutMetadata,
+    auditTimeline: db.audit_timeline || db.auditTimeline || [],
+  };
+};
 
 const mapVisitorToDb = (v: Partial<Visitor>) => {
   const db: any = {};
@@ -140,6 +173,7 @@ const mapVisitorToDb = (v: Partial<Visitor>) => {
   if (v.company !== undefined) db.company = v.company;
   if (v.department !== undefined) db.department = v.department;
   if (v.employeeToMeet !== undefined) db.employee_to_meet = v.employeeToMeet;
+  if (v.hostEmployeeId !== undefined) db.host_employee_id = v.hostEmployeeId;
   if (v.purpose !== undefined) db.purpose = v.purpose;
   if (v.vehicleNumber !== undefined) db.vehicle_number = v.vehicleNumber;
   if (v.status !== undefined) db.status = v.status;
@@ -160,6 +194,11 @@ const mapVisitorToDb = (v: Partial<Visitor>) => {
   if (v.meetingCompleted !== undefined) db.meeting_completed = v.meetingCompleted;
   if (v.readyForExit !== undefined) db.ready_for_exit = v.readyForExit;
   if (v.meetingCompletedTime !== undefined) db.meeting_completed_time = v.meetingCompletedTime;
+  if (v.checkedInBy !== undefined) db.checked_in_by = v.checkedInBy;
+  if (v.checkedOutBy !== undefined) db.checked_out_by = v.checkedOutBy;
+  if (v.totalVisitDuration !== undefined) db.total_visit_duration = v.totalVisitDuration;
+  if (v.whatsappSent !== undefined) db.whatsapp_sent = v.whatsappSent;
+  if (v.whatsappSentTime !== undefined) db.whatsapp_sent_time = v.whatsappSentTime;
   if (v.gateId !== undefined) db.gate_id = v.gateId;
   if (v.sessionId !== undefined) db.session_id = v.sessionId;
   if (v.registrationMetadata !== undefined) db.registration_metadata = v.registrationMetadata;
@@ -255,10 +294,14 @@ export const VisitorProvider: React.FC<{ children: React.ReactNode }> = ({ child
         (payload) => {
           if (payload.eventType === 'INSERT') {
             const newV = mapDbToVisitor(payload.new);
-            setVisitors(prev => [newV, ...prev.filter(v => v.id !== newV.id)]);
+            setVisitors(prev => {
+              const existing = prev.find(v => v.id === newV.id);
+              const preserved = existing ? { ...newV, sessionId: newV.sessionId || existing.sessionId, qrToken: newV.qrToken || existing.qrToken } : newV;
+              return [preserved, ...prev.filter(v => v.id !== newV.id)];
+            });
           } else if (payload.eventType === 'UPDATE') {
             const updatedV = mapDbToVisitor(payload.new);
-            setVisitors(prev => prev.map(v => v.id === updatedV.id ? updatedV : v));
+            setVisitors(prev => prev.map(v => v.id === updatedV.id ? { ...updatedV, sessionId: updatedV.sessionId || v.sessionId, qrToken: updatedV.qrToken || v.qrToken } : v));
           } else if (payload.eventType === 'DELETE') {
             setVisitors(prev => prev.filter(v => v.id !== payload.old.id));
           }
@@ -345,10 +388,12 @@ export const VisitorProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const metadata = getBrowserMetadata();
     metadata.ip = ip;
 
+    const sessionId = crypto.randomUUID();
+
     const newVisitor: Visitor = {
       ...data,
       id: crypto.randomUUID(),
-      qrToken: crypto.randomUUID(),
+      sessionId,
       status: 'PENDING_APPROVAL',
       registrationTime: new Date().toISOString(),
       registrationMetadata: metadata,
@@ -359,11 +404,23 @@ export const VisitorProvider: React.FC<{ children: React.ReactNode }> = ({ child
       }]
     };
 
+    setVisitorSession(newVisitor.id, sessionId);
     setVisitors(prev => [newVisitor, ...prev]);
     addAuditLog(newVisitor.id, 'Registered', data.name, 'Visitor', '', 'PENDING_APPROVAL');
 
     try {
       await supabase.from('visitors').insert([mapVisitorToDb(newVisitor)]);
+
+      if (newVisitor.hostEmployeeId) {
+        supabase.functions.invoke('send-host-push', {
+          body: {
+            hostEmployeeId: newVisitor.hostEmployeeId,
+            visitorName: newVisitor.name,
+            visitorId: newVisitor.id,
+            company: newVisitor.company
+          }
+        }).catch(err => console.warn('Push function failed:', err));
+      }
     } catch (err) {
       console.warn('Supabase visitor insert notice:', err);
     }
@@ -373,13 +430,18 @@ export const VisitorProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const updateStatus = async (id: string, newStatus: VisitorStatus, actor: string, extra?: Partial<Visitor>, isForceExit?: boolean) => {
     const target = visitors.find(v => v.id === id);
-    if (!target) return;
+    if (!target) {
+      console.warn(`[updateStatus] Visitor not found for ID: ${id}`);
+      return;
+    }
+
+    console.log('Status before update:', target.status);
 
     let validTransitions: Record<VisitorStatus, VisitorStatus[]> = {
       'PENDING_APPROVAL': ['APPROVED', 'REJECTED'],
-      'APPROVED': ['INSIDE'],
-      'INSIDE': ['READY_FOR_EXIT', 'INSIDE'],
-      'READY_FOR_EXIT': ['COMPLETED'],
+      'APPROVED': ['INSIDE', 'REJECTED'],
+      'INSIDE': ['READY_FOR_EXIT', 'COMPLETED', 'INSIDE'],
+      'READY_FOR_EXIT': ['COMPLETED', 'INSIDE'],
       'COMPLETED': [],
       'REJECTED': []
     };
@@ -394,11 +456,19 @@ export const VisitorProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
 
     let additionalData = { ...extra };
-    if (newStatus === 'INSIDE' && !additionalData.entryTime) {
-      additionalData.entryTime = new Date().toISOString();
+    if (newStatus === 'INSIDE') {
+      if (!additionalData.entryTime) additionalData.entryTime = new Date().toISOString();
+      if (!additionalData.checkedInBy) additionalData.checkedInBy = actor;
     }
-    if (newStatus === 'COMPLETED' && !additionalData.exitTime) {
-      additionalData.exitTime = new Date().toISOString();
+    if (newStatus === 'READY_FOR_EXIT') {
+      additionalData.readyForExit = true;
+      additionalData.meetingCompleted = true;
+    }
+    if (newStatus === 'COMPLETED') {
+      if (!additionalData.exitTime) additionalData.exitTime = new Date().toISOString();
+      additionalData.readyForExit = false;
+      additionalData.meetingCompleted = true;
+      if (!additionalData.checkedOutBy) additionalData.checkedOutBy = actor;
     }
 
     const updatedVisitor: Visitor = {
@@ -415,23 +485,68 @@ export const VisitorProvider: React.FC<{ children: React.ReactNode }> = ({ child
       ]
     };
 
-    setVisitors(prev => prev.map(v => v.id === id ? updatedVisitor : v));
+    // 1. AWAIT Supabase update query FIRST before changing UI state
+    const dbPayload = mapVisitorToDb(updatedVisitor);
+    try {
+      let { data, error } = await supabase
+        .from('visitors')
+        .update(dbPayload)
+        .eq('id', id)
+        .select();
+
+      // If a newly added column is missing from Supabase schema, retry with core columns fallback
+      if (error && (error.message?.includes('schema cache') || error.code === 'PGRST204')) {
+        console.warn('Supabase schema missing column notice, retrying with core payload:', error.message);
+        const corePayload: any = {
+          status: updatedVisitor.status
+        };
+        if (updatedVisitor.exitTime) corePayload.exit_time = updatedVisitor.exitTime;
+        if (updatedVisitor.entryTime) corePayload.entry_time = updatedVisitor.entryTime;
+        if (updatedVisitor.readyForExit !== undefined) corePayload.ready_for_exit = updatedVisitor.readyForExit;
+        if (updatedVisitor.meetingCompleted !== undefined) corePayload.meeting_completed = updatedVisitor.meetingCompleted;
+
+        const retryRes = await supabase
+          .from('visitors')
+          .update(corePayload)
+          .eq('id', id)
+          .select();
+
+        data = retryRes.data;
+        error = retryRes.error;
+      }
+
+      if (error) {
+        console.error('Supabase update error:', error);
+        alert(`Supabase Checkout Update Failed: ${error.message || JSON.stringify(error)}`);
+      } else {
+        console.log('Supabase response:', data);
+      }
+    } catch (err) {
+      console.error('Supabase update status exception:', err);
+    }
+
+    console.log('Status after update:', newStatus);
+
+    // 2. Synchronously update local state and LocalStorage
+    setVisitors(prev => {
+      const next = prev.map(v => v.id === id ? updatedVisitor : v);
+      try {
+        localStorage.setItem('vms_visitors', JSON.stringify(next));
+      } catch (e) {
+        console.warn('LocalStorage save error:', e);
+      }
+      return next;
+    });
 
     if (isForceExit && additionalData.overrideReason) {
       addAuditLog(id, `Status Override: ${newStatus.replace('_', ' ')}`, actor, 'Security', target.status, newStatus, additionalData.overrideReason);
     } else {
       addAuditLog(id, `Status Updated: ${newStatus.replace('_', ' ')}`, actor, actor === 'System' ? 'System' : 'Employee/Security', target.status, newStatus);
     }
-
-    try {
-      await supabase.from('visitors').update(mapVisitorToDb(updatedVisitor)).eq('id', id);
-    } catch (err) {
-      console.warn('Supabase update status notice:', err);
-    }
   };
 
-  const getVisitorByToken = (token: string) => {
-    return visitors.find(v => v.qrToken === token);
+  const getVisitorById = (id: string) => {
+    return visitors.find(v => v.id === id);
   };
 
   const getVisitorHistory = (mobile: string) => {
@@ -458,7 +573,6 @@ export const VisitorProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const newVisitor: Visitor = {
       ...data,
       id: crypto.randomUUID(),
-      qrToken: crypto.randomUUID(),
       status: 'APPROVED',
       registrationTime: new Date().toISOString(),
       isPreRegistered: true,
@@ -483,7 +597,7 @@ export const VisitorProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   return (
-    <VisitorContext.Provider value={{ visitors, auditLogs, registerVisitor, preRegisterVisitor, updateStatus, getVisitorByToken, getVisitorHistory }}>
+    <VisitorContext.Provider value={{ visitors, auditLogs, registerVisitor, preRegisterVisitor, updateStatus, getVisitorById, getVisitorHistory }}>
       {children}
     </VisitorContext.Provider>
   );

@@ -1,22 +1,28 @@
 /* src/css/sidebar.css */
 .ui-layout-sidebar {
-  width: 230px;
+  width: 240px;
   background-color: var(--bg-card);
   border-right: 1px solid var(--border-color);
   display: flex;
   flex-direction: column;
   transition: width var(--transition-normal);
   z-index: 40;
+  box-shadow: var(--shadow-sm);
 }
 
 /* Collapsed State */
 .ui-layout-sidebar.collapsed {
-  width: 72px;
+  width: 64px;
 }
 
 .ui-layout-sidebar.collapsed .ui-layout-sidebar-header h2,
-.ui-layout-sidebar.collapsed .ui-layout-user-info {
-  display: none;
+.ui-layout-sidebar.collapsed .ui-layout-user-info,
+.ui-layout-sidebar.collapsed .ui-layout-user,
+.ui-layout-sidebar.collapsed .ui-layout-nav-group,
+.ui-layout-sidebar.collapsed .makoro-logo-group h2,
+.ui-layout-sidebar.collapsed .makoro-collapse-btn,
+.ui-layout-sidebar.collapsed .ui-layout-nav-link span {
+  display: none !important;
 }
 
 .ui-layout-sidebar.collapsed .ui-layout-sidebar-header {
@@ -24,8 +30,14 @@
   justify-content: center;
 }
 
+.ui-layout-sidebar.collapsed .makoro-logo-group {
+  justify-content: center;
+  gap: 0;
+}
+
 .ui-layout-sidebar.collapsed .ui-layout-sidebar-footer {
   justify-content: center;
+  padding: 0.75rem 0;
 }
 
 .ui-layout-sidebar.collapsed .ui-layout-logout {
@@ -33,51 +45,126 @@
 }
 
 .ui-layout-sidebar.collapsed .ui-layout-nav-link {
-  padding: 0.5rem;
+  padding: 0;
   justify-content: center;
   overflow: hidden;
   white-space: nowrap;
+  gap: 0;
+  border-left: 3px solid transparent;
+}
+
+.ui-layout-sidebar.collapsed .ui-layout-nav-link.active {
+  border-left-color: transparent;
+  background-color: var(--bg-selected);
 }
 
 .ui-layout-sidebar.collapsed .ui-layout-nav-link svg {
   flex-shrink: 0;
+  margin: 0;
 }
 
-.ui-layout-sidebar.collapsed .ui-layout-nav-link {
-  font-size: 0;
-  gap: 0;
+.ui-layout-sidebar.collapsed .makoro-bottom-links {
+  border-top: none;
+  padding: 0.25rem 0;
 }
 
+/* Header */
 .ui-layout-sidebar-header {
-  height: 80px;
-  padding: 0 1.5rem;
+  height: 64px;
+  padding: 0 1.25rem;
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  justify-content: space-between;
   border-bottom: 1px solid var(--border-color);
 }
 
+.makoro-logo-group {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.makoro-logo-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid var(--border-color);
+  background: var(--bg-main);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--primary-color);
+  flex-shrink: 0;
+}
+
+.makoro-logo-group h2 {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.makoro-collapse-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-main);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.makoro-collapse-btn:hover {
+  background: var(--bg-card-hover);
+  color: var(--text-primary);
+}
+
+/* Navigation */
 .ui-layout-nav {
   flex: 1;
-  padding: 1rem 0.75rem;
+  padding: 0.75rem 0.5rem;
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
+  gap: 8px; /* Menu spacing 8px */
   overflow-y: auto;
+}
+
+.ui-layout-nav-group {
+  padding: 0.75rem 0.5rem 0.25rem 0.5rem;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  text-transform: uppercase;
 }
 
 .ui-layout-nav-link {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  padding: 0.5rem 1rem;
+  padding: 0 0.75rem;
+  height: 42px; /* Menu height 42px */
   border-radius: var(--radius-md);
   color: var(--text-secondary);
-  font-size: 15px;
+  font-size: 14px; /* Menu 14px */
   font-weight: 500;
+  text-decoration: none;
   transition: all var(--transition-fast);
   position: relative;
-  overflow: hidden;
+  border-left: 3px solid transparent;
+}
+
+.ui-layout-nav-link svg {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
 }
 
 .ui-layout-nav-link:hover {
@@ -86,57 +173,53 @@
 }
 
 .ui-layout-nav-link.active {
-  background-color: transparent;
+  background-color: var(--bg-selected); /* Very light blue */
   color: var(--primary-color);
   font-weight: 600;
+  border-left-color: var(--primary-color); /* Blue left indicator */
 }
 
-.ui-layout-nav-link.active::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 15%;
-  bottom: 15%;
-  width: 4px;
-  border-radius: 0 4px 4px 0;
-  background: var(--primary-color);
+.makoro-bottom-links {
+  padding: 0.5rem 0.5rem;
+  border-top: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
+/* Footer / Compact User Profile Card */
 .ui-layout-sidebar-footer {
-  padding: 1rem;
+  padding: 0.75rem 1rem;
   border-top: 1px solid var(--border-color);
   display: flex;
   align-items: center;
   justify-content: space-between;
+  background-color: var(--bg-main);
+  gap: 0.5rem;
 }
 
-.ui-layout-user-info {
+.ui-layout-user {
   display: flex;
   flex-direction: column;
-}
-
-.ui-layout-user-avatar {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, var(--primary-color) 0%, var(--info-color) 100%);
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 600;
-  box-shadow: var(--shadow-sm);
+  overflow: hidden;
 }
 
 .ui-layout-user-name {
-  font-size: 0.875rem;
+  font-size: 13px;
   font-weight: 600;
   color: var(--text-primary);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
 }
 
-.ui-layout-user-role {
-  font-size: 0.75rem;
+.ui-layout-user-role,
+.ui-layout-user-email {
+  font-size: 11px;
   color: var(--text-muted);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
 }
 
 .ui-layout-logout {
@@ -144,9 +227,12 @@
   border: none;
   color: var(--text-muted);
   cursor: pointer;
-  padding: 0.5rem;
+  padding: 0.4rem;
   border-radius: var(--radius-sm);
   transition: all var(--transition-fast);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .ui-layout-logout:hover {

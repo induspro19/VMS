@@ -1,11 +1,12 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-
+import { useVisitor } from '../../context/VisitorContext';
+import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
-import { UserCircle, Search, Clock, Activity, Bell, Edit, XCircle, UserPlus, RefreshCw } from 'lucide-react';
+import { AlertBanner } from '../../components/ui/AlertBanner';
+import { Search, Bell, Edit, XCircle, UserPlus, RefreshCw } from 'lucide-react';
 import { Input } from '../../components/ui/Input';
-import { useVisitor } from '../../context/VisitorContext';
 import { useNotification } from '../../context/NotificationContext';
 import { useCommunication } from '../../context/CommunicationContext';
 import { useAuth } from '../../context/AuthContext';
@@ -20,12 +21,6 @@ export const ReceptionDashboard: React.FC = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
 
-  const [time, setTime] = useState(new Date());
-  useEffect(() => {
-    const timer = setInterval(() => setTime(new Date()), 1000);
-    return () => clearInterval(timer);
-  }, []);
-
   const [search, setSearch] = useState('');
   
   // Registration Modal State
@@ -34,6 +29,11 @@ export const ReceptionDashboard: React.FC = () => {
 
   // Quick Action Modal
   const [confirmModal, setConfirmModal] = useState<{ isOpen: boolean; visitorId: string | null; action: 'REMIND' | 'CANCEL' | null }>({ isOpen: false, visitorId: null, action: null });
+
+  const todaysLogs = useMemo(() => {
+    const today = new Date().toDateString();
+    return auditLogs.filter(log => new Date(log.timestamp).toDateString() === today).slice(0, 50);
+  }, [auditLogs]);
 
   const todaysVisitors = useMemo(() => {
     const today = new Date().toDateString();
@@ -70,6 +70,20 @@ export const ReceptionDashboard: React.FC = () => {
     if (!v) return;
 
     if (confirmModal.action === 'REMIND') {
+      if (v.hostEmployeeId) {
+        import('../../lib/supabase').then(({ supabase }) => {
+          supabase.functions.invoke('send-host-push', {
+            body: {
+              hostEmployeeId: v.hostEmployeeId,
+              visitorName: v.name,
+              visitorId: v.id,
+              company: v.company,
+              notificationType: 'REMINDER',
+              message: `${v.name} is still waiting for you.`
+            }
+          }).catch(err => console.warn('Reminder Push failed:', err));
+        });
+      }
       sendPush('Visitor Reminder', `${v.name} is still waiting for you at the reception.`, 'WARNING');
       sendCommunication(v.name, v.employeeToMeet, 'Push Notification', 'Host Reminder', 'Visitor is waiting');
       toast(`Reminder sent to ${v.employeeToMeet}.`, 'success');
@@ -80,144 +94,153 @@ export const ReceptionDashboard: React.FC = () => {
     setConfirmModal({ isOpen: false, visitorId: null, action: null });
   };
 
-  const todaysLogs = useMemo(() => {
-    const today = new Date().toDateString();
-    return auditLogs.filter(log => new Date(log.timestamp).toDateString() === today).slice(0, 30);
-  }, [auditLogs]);
-
   return (
-    <div className="animate-fade-in" style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+    <div style={{ height: '100%', padding: '1rem 2rem', maxWidth: '1400px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '1rem', overflow: 'hidden' }}>
       
-      {/* Header Row */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexShrink: 0 }}>
-        <div>
-          <h1 style={{ fontSize: '24px', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <UserCircle size={24} style={{ color: 'var(--primary-color)' }} />
-            Reception Command Center
-          </h1>
-          <div style={{ fontSize: '13px', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.25rem' }}>
-            <Clock size={14} /> {time.toLocaleTimeString()} • {time.toLocaleDateString()}
-          </div>
+      {/* 1. Header & Alerts */}
+      <div>
+        <h1 style={{ fontSize: '1.5rem', fontWeight: 600, margin: '0 0 1rem 0' }}>Reception Dashboard</h1>
+        <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+          {waiting.length > 5 && <AlertBanner variant="warning">High volume: {waiting.length} visitors waiting in lounge</AlertBanner>}
+          {avgWaitTimeMins > 15 && <AlertBanner variant="danger">High wait times: Avg {Math.round(avgWaitTimeMins)} mins</AlertBanner>}
+          {expected.length > 0 && <AlertBanner variant="info">{expected.length} expected VIPs/Pre-registered today</AlertBanner>}
         </div>
       </div>
 
-      {/* KPI Row */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '0.75rem', marginBottom: '1rem', flexShrink: 0 }}>
-        <div className="ui-card" style={{ padding: '0.75rem', height: '84px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-          <div style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 500, textTransform: 'uppercase' }}>Expected Today</div>
-          <div style={{ fontSize: '28px', fontWeight: 700, color: 'var(--primary-color)', lineHeight: 1 }}>{expected.length}</div>
-        </div>
-        <div className={`ui-card ${waiting.length > 0 ? 'bg-danger-light border-danger-color' : ''}`} style={{ padding: '0.75rem', height: '84px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-          <div style={{ fontSize: '12px', color: waiting.length > 0 ? 'var(--danger-color)' : 'var(--text-secondary)', fontWeight: 500, textTransform: 'uppercase' }}>Waiting in Lounge</div>
-          <div style={{ fontSize: '28px', fontWeight: 700, color: waiting.length > 0 ? 'var(--danger-color)' : 'var(--text-primary)', lineHeight: 1 }}>{waiting.length}</div>
-        </div>
-        <div className="ui-card" style={{ padding: '0.75rem', height: '84px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-          <div style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 500, textTransform: 'uppercase' }}>Walk-ins</div>
-          <div style={{ fontSize: '28px', fontWeight: 700, color: 'var(--info-color)', lineHeight: 1 }}>{walkIns.length}</div>
-        </div>
-        <div className="ui-card" style={{ padding: '0.75rem', height: '84px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-          <div style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 500, textTransform: 'uppercase' }}>Approved</div>
-          <div style={{ fontSize: '28px', fontWeight: 700, color: 'var(--success-color)', lineHeight: 1 }}>{approved.length}</div>
-        </div>
-        <div className="ui-card" style={{ padding: '0.75rem', height: '84px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-          <div style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 500, textTransform: 'uppercase' }}>Avg Wait Time</div>
-          <div style={{ fontSize: '28px', fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1 }}>{avgWaitTimeMins.toFixed(0)}m</div>
-        </div>
-      </div>
-
-      {/* Main Content Area (70/30 Split) */}
-      <div style={{ display: 'grid', gridTemplateColumns: '7fr 3fr', gap: '1rem', flex: 1, minHeight: 0 }}>
+      {/* 2. Top KPI Cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1.5rem' }}>
+        <Card variant="primary">
+          <CardContent style={{ padding: '1.5rem' }}>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Expected Today</div>
+            <div style={{ fontSize: '2rem', fontWeight: 700, margin: '0.5rem 0' }}>{expected.length}</div>
+            <div style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>pre-registered</div>
+          </CardContent>
+        </Card>
         
-        {/* Left Column: Waiting Lounge Table */}
-        <div className="ui-card" style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-          <div style={{ padding: '0.75rem 1rem', borderBottom: '1px solid var(--border-color)', backgroundColor: 'var(--bg-card-hover)', fontWeight: 600, fontSize: '14px', flexShrink: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span>Waiting Lounge</span>
-            <div className="ui-search-box" style={{ width: '200px', position: 'relative' }}>
-              <input className="ui-input" placeholder="Search waiting..." value={search} onChange={e => setSearch(e.target.value)} style={{ height: '32px', fontSize: '13px', paddingLeft: '32px', margin: 0 }} />
-              <Search size={14} className="ui-search-icon" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} />
-            </div>
-          </div>
-          <div style={{ flex: 1, overflowY: 'auto' }}>
-            <table className="ui-table" style={{ margin: 0, width: '100%' }}>
-              <thead>
-                <tr>
-                  <th style={{ padding: '0.5rem 1rem' }}>Visitor</th>
-                  <th style={{ padding: '0.5rem 1rem' }}>Host</th>
-                  <th style={{ padding: '0.5rem 1rem' }}>Waiting Time</th>
-                  <th style={{ padding: '0.5rem 1rem', textAlign: 'right' }}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {waiting.filter(v => v.name.toLowerCase().includes(search.toLowerCase())).length === 0 && (
-                  <tr>
-                    <td colSpan={4} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
-                      Waiting lounge is empty.
-                    </td>
-                  </tr>
-                )}
-                {waiting.filter(v => v.name.toLowerCase().includes(search.toLowerCase())).map(v => {
-                  const waitMins = Math.floor((time.getTime() - new Date(v.registrationTime).getTime()) / 60000);
-                  return (
-                    <tr key={v.id}>
-                      <td>
-                        <div style={{ fontWeight: 500 }}>{v.name}</div>
-                        <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{v.company} • {v.mobile}</div>
-                        {v.purpose.toLowerCase().includes('vip') && <Badge variant="warning" style={{ marginTop: '0.25rem' }}>VIP</Badge>}
-                      </td>
-                      <td>
-                        <div style={{ fontWeight: 500 }}>{v.employeeToMeet}</div>
-                        <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{v.department}</div>
-                      </td>
-                      <td>
-                        <span style={{ color: waitMins > 15 ? 'var(--danger-color)' : 'inherit', fontWeight: waitMins > 15 ? 700 : 400 }}>
-                          {waitMins} min{waitMins !== 1 ? 's' : ''}
-                        </span>
-                      </td>
-                      <td style={{ textAlign: 'right', display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
-                        <button title="Remind Host" onClick={() => setConfirmModal({ isOpen: true, visitorId: v.id, action: 'REMIND' })} style={{ padding: '0.25rem', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--info-color)' }}><Bell size={16} /></button>
-                        <button title="Edit Details" onClick={() => navigate(`/reception/visitor/${v.id}`)} style={{ padding: '0.25rem', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}><Edit size={16} /></button>
-                        <button title="Cancel Visit" onClick={() => setConfirmModal({ isOpen: true, visitorId: v.id, action: 'CANCEL' })} style={{ padding: '0.25rem', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger-color)' }}><XCircle size={16} /></button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        <Card variant="info">
+          <CardContent style={{ padding: '1.5rem' }}>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Walk-ins</div>
+            <div style={{ fontSize: '2rem', fontWeight: 700, margin: '0.5rem 0' }}>{walkIns.length}</div>
+            <div style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>unregistered arrivals</div>
+          </CardContent>
+        </Card>
 
-        {/* Right Column: Live Activity Timeline */}
-        <div className="ui-card" style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-          <div style={{ padding: '0.75rem 1rem', borderBottom: '1px solid var(--border-color)', backgroundColor: 'var(--bg-card-hover)', fontWeight: 600, fontSize: '14px', flexShrink: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <Activity size={16} style={{ color: 'var(--primary-color)' }} />
-            Reception Timeline
-          </div>
-          <div style={{ flex: 1, overflowY: 'auto', padding: '1rem' }}>
-            {todaysLogs.length === 0 && <div className="text-muted text-sm text-center py-4">No activity yet.</div>}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', position: 'relative', paddingLeft: '1rem', borderLeft: '2px solid var(--border-color)' }}>
-              {todaysLogs.map(log => {
+        <Card variant={waiting.length > 0 ? "warning" : "info"}>
+          <CardContent style={{ padding: '1.5rem' }}>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Waiting Lounge</div>
+            <div style={{ fontSize: '2rem', fontWeight: 700, margin: '0.5rem 0' }}>{waiting.length}</div>
+            <div style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>avg wait {Math.round(avgWaitTimeMins)}m</div>
+          </CardContent>
+        </Card>
+
+        <Card variant="success">
+          <CardContent style={{ padding: '1.5rem' }}>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Approved</div>
+            <div style={{ fontSize: '2rem', fontWeight: 700, margin: '0.5rem 0' }}>{approved.length}</div>
+            <div style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>ready for security</div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* 3. Middle Detail Cards (3 Columns) */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.5rem', flex: 1 }}>
+        
+        {/* Waiting Lounge */}
+        <Card variant="warning" style={{ display: 'flex', flexDirection: 'column' }}>
+          <CardHeader style={{ paddingBottom: '0.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
+            <CardTitle style={{ whiteSpace: 'nowrap' }}>Waiting Lounge</CardTitle>
+            <div style={{ position: 'relative', width: '110px', flexShrink: 0 }}>
+              <Search size={12} style={{ position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+              <input 
+                placeholder="Search..." 
+                value={search} 
+                onChange={e => setSearch(e.target.value)} 
+                style={{ width: '100%', padding: '0.2rem 0.2rem 0.2rem 1.5rem', fontSize: '0.75rem', border: '1px solid var(--border-color)', borderRadius: '6px', outline: 'none' }} 
+              />
+            </div>
+          </CardHeader>
+          <CardContent style={{ padding: '1rem', flex: 1, overflowY: 'auto' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              {waiting.filter(v => v.name.toLowerCase().includes(search.toLowerCase())).map(v => {
+                const waitMins = Math.floor((new Date().getTime() - new Date(v.registrationTime).getTime()) / 60000);
+                return (
+                  <div key={v.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '0.75rem', borderBottom: '1px solid var(--border-color)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                      <Badge minimal variant={waitMins > 15 ? 'danger' : 'warning'}>{waitMins}m WAIT</Badge>
+                      <div>
+                        <div style={{ fontSize: '0.875rem', fontWeight: 500 }}>{v.name}</div>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Host: {v.employeeToMeet}</div>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <button title="Remind Host" onClick={() => setConfirmModal({ isOpen: true, visitorId: v.id, action: 'REMIND' })} style={{ padding: '0.25rem', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--info-color)' }}><Bell size={16} /></button>
+                      <button title="Cancel Visit" onClick={() => setConfirmModal({ isOpen: true, visitorId: v.id, action: 'CANCEL' })} style={{ padding: '0.25rem', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger-color)' }}><XCircle size={16} /></button>
+                    </div>
+                  </div>
+                );
+              })}
+              {waiting.length === 0 && <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', textAlign: 'center', padding: '2rem 0' }}>Lounge is empty</div>}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Expected & Approved */}
+        <Card variant="info" style={{ display: 'flex', flexDirection: 'column' }}>
+          <CardHeader style={{ paddingBottom: '0.5rem' }}>
+            <CardTitle>Expected & Approved</CardTitle>
+          </CardHeader>
+          <CardContent style={{ padding: '1rem', flex: 1, overflowY: 'auto' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              {[...expected, ...approved].slice(0, 10).map(v => (
+                <div key={v.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '0.75rem', borderBottom: '1px solid var(--border-color)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                    <Badge minimal variant={v.isPreRegistered ? 'info' : 'success'}>
+                      {v.isPreRegistered ? 'EXPECTED' : 'APPROVED'}
+                    </Badge>
+                    <div>
+                      <div style={{ fontSize: '0.875rem', fontWeight: 500 }}>{v.name}</div>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{v.company}</div>
+                    </div>
+                  </div>
+                  <button title="Edit Details" onClick={() => navigate(`/reception/visitor/${v.id}`)} style={{ padding: '0.25rem', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}><Edit size={16} /></button>
+                </div>
+              ))}
+              {expected.length === 0 && approved.length === 0 && <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', textAlign: 'center', padding: '2rem 0' }}>No expected visitors</div>}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Live Activity Feed */}
+        <Card variant="primary" style={{ display: 'flex', flexDirection: 'column' }}>
+          <CardHeader style={{ paddingBottom: '0.5rem' }}>
+            <CardTitle>Reception Logs</CardTitle>
+          </CardHeader>
+          <CardContent style={{ padding: '1rem', flex: 1, overflowY: 'auto' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', position: 'relative', paddingLeft: '1rem', borderLeft: '1px solid var(--border-color)' }}>
+              {todaysLogs.slice(0, 10).map(log => {
                 let dotColor = 'var(--text-muted)';
                 if (log.action.includes('Registered')) dotColor = 'var(--primary-color)';
-                else if (log.action.includes('APPROVED')) dotColor = 'var(--info-color)';
+                else if (log.action.includes('APPROVED')) dotColor = 'var(--success-color)';
                 else if (log.action.includes('Reminder')) dotColor = 'var(--warning-color)';
                 else if (log.action.includes('REJECTED')) dotColor = 'var(--danger-color)';
 
                 return (
                   <div key={log.id} style={{ position: 'relative' }}>
-                    <div style={{ position: 'absolute', left: '-1.35rem', top: '0.25rem', width: '10px', height: '10px', borderRadius: '50%', backgroundColor: dotColor, border: '2px solid var(--bg-card)' }} />
-                    <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{new Date(log.timestamp).toLocaleTimeString()}</div>
-                    <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-primary)' }}>{log.action}</div>
-                    <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>by {log.actor}</div>
+                    <div style={{ position: 'absolute', left: '-1.35rem', top: '0.25rem', width: '8px', height: '8px', borderRadius: '50%', backgroundColor: dotColor, border: '2px solid var(--bg-card)' }} />
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{new Date(log.timestamp).toLocaleTimeString()}</div>
+                    <div style={{ fontSize: '0.875rem', fontWeight: 500, color: 'var(--text-primary)' }}>{log.action}</div>
                   </div>
                 );
               })}
+              {todaysLogs.length === 0 && <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', textAlign: 'center', padding: '2rem 0' }}>No logs yet</div>}
             </div>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
+
       </div>
 
-      {/* Quick Action Toolbar (Fixed Bottom) */}
-      <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem', flexShrink: 0, padding: '0.75rem', backgroundColor: 'var(--bg-card)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-color)' }}>
+      {/* 4. Quick Action Toolbar */}
+      <div style={{ display: 'flex', gap: '1rem', padding: '1rem', backgroundColor: 'var(--bg-card)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-color)' }}>
         <Button variant="primary" leftIcon={<UserPlus size={16} />} onClick={() => setIsRegisterOpen(true)}>+ New Walk-in Registration</Button>
         <div style={{ flex: 1 }} />
         <Button variant="ghost" leftIcon={<RefreshCw size={16} />} onClick={() => toast('Dashboard Refreshed', 'success')}>Refresh</Button>

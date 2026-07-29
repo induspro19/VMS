@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { supabase } from '../lib/supabase';
 
 export interface GlobalSettings {
   departments: string[];
@@ -7,40 +8,188 @@ export interface GlobalSettings {
   meetingDurationMaxHours: number;
   companyName: string;
   companyLogo: string;
+  _updatedAt?: number; // timestamp ms for conflict resolution
 }
 
-const defaultSettings: GlobalSettings = {
-  departments: ['Engineering', 'HR', 'Sales', 'Management', 'Operations'],
-  employees: ['John Doe', 'Jane Smith', 'Michael Johnson', 'Sarah Williams'],
-  visitorPurposes: ['Meeting', 'Interview', 'Delivery', 'Maintenance', 'Personal'],
+// Only used on absolute first install
+const DB_DEFAULT_DEPARTMENTS = ['Engineering', 'HR', 'Sales', 'Management', 'Operations'];
+
+const FALLBACK_DEFAULTS: GlobalSettings = {
+  departments: DB_DEFAULT_DEPARTMENTS,
+  employees: [],
+  visitorPurposes: ['Meeting', 'Interview', 'Delivery', 'Maintenance', 'Personal', 'Other'],
   meetingDurationMaxHours: 4,
-  companyName: 'Acme Corporation',
-  companyLogo: 'https://via.placeholder.com/150',
+  companyName: 'Enterprise VMS',
+  companyLogo: '',
+  _updatedAt: 0,
 };
 
 interface SettingsContextType {
   settings: GlobalSettings;
-  updateSettings: (newSettings: Partial<GlobalSettings>) => void;
+  updateSettings: (newSettings: Partial<GlobalSettings>) => Promise<void>;
+  isLoaded: boolean;
 }
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
 
+const LS_KEY = 'vms_settings_v2'; // new key to avoid stale data from old format
+
+function mapRowToSettings(data: any): GlobalSettings {
+  return {
+    departments: Array.isArray(data.departments) ? data.departments : [],
+    employees: [],
+    visitorPurposes: Array.isArray(data.visitor_purposes) ? data.visitor_purposes : FALLBACK_DEFAULTS.visitorPurposes,
+    meetingDurationMaxHours: data.meeting_duration_max_hours || FALLBACK_DEFAULTS.meetingDurationMaxHours,
+    companyName: data.company_name || FALLBACK_DEFAULTS.companyName,
+    companyLogo: data.company_logo || '',
+    _updatedAt: data.updated_at ? new Date(data.updated_at).getTime() : 0,
+  };
+}
+
+function getLocalSettings(): GlobalSettings | null {
+  try {
+    const saved = localStorage.getItem(LS_KEY);
+    return saved ? JSON.parse(saved) : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveLocalSettings(s: GlobalSettings) {
+  localStorage.setItem(LS_KEY, JSON.stringify(s));
+}
+
 export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [settings, setSettings] = useState<GlobalSettings>(() => {
-    const saved = localStorage.getItem('vms_settings');
-    return saved ? JSON.parse(saved) : defaultSettings;
-  });
+  const [settings, setSettings] = useState<GlobalSettings>(FALLBACK_DEFAULTS);
+  const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
-    localStorage.setItem('vms_settings', JSON.stringify(settings));
-  }, [settings]);
+    let isMounted = true;
 
-  const updateSettings = (newSettings: Partial<GlobalSettings>) => {
-    setSettings(prev => ({ ...prev, ...newSettings }));
+    const fetchSettings = async () => {
+      const localData = getLocalSettings();
+
+      try {
+        const { data, error } = await supabase
+          .from('app_settings')
+          .select('*')
+          .eq('id', 1)
+          .maybeSingle();
+
+        if (data && !error && isMounted) {
+          const dbSettings = mapRowToSettings(data);
+          const dbTimestamp = dbSettings._updatedAt || 0;
+          const localTimestamp = localData?._updatedAt || 0;
+
+          // Use whichever was updated more recently
+          if (localTimestamp > dbTimestamp) {
+            // Local is newer (Supabase write may have failed before) — push local to DB
+            console.log('[Settings] localStorage is newer than Supabase — pushing local state to DB');
+            setSettings(localData!);
+            // Sync back to Supabase
+            await supabase.from('app_settings').upsert({
+              id: 1,
+              departments: localData!.departments,
+              visitor_purposes: localData!.visitorPurposes,
+              meeting_duration_max_hours: localData!.meetingDurationMaxHours,
+              company_name: localData!.companyName,
+              company_logo: localData!.companyLogo,
+              updated_at: new Date(localTimestamp).toISOString(),
+            }, { onConflict: 'id' });
+          } else {
+            // DB is authoritative — use DB data and sync to localStorage
+            setSettings(dbSettings);
+            saveLocalSettings(dbSettings);
+          }
+        } else {
+          // Supabase unavailable or table missing
+          if (localData && isMounted) {
+            setSettings(localData);
+          } else if (isMounted) {
+            // Very first install — seed defaults
+            const firstInstall = { ...FALLBACK_DEFAULTS, _updatedAt: Date.now() };
+            setSettings(firstInstall);
+            saveLocalSettings(firstInstall);
+            await supabase.from('app_settings').upsert({
+              id: 1,
+              departments: DB_DEFAULT_DEPARTMENTS,
+              visitor_purposes: FALLBACK_DEFAULTS.visitorPurposes,
+              meeting_duration_max_hours: FALLBACK_DEFAULTS.meetingDurationMaxHours,
+              company_name: FALLBACK_DEFAULTS.companyName,
+              updated_at: new Date().toISOString(),
+            }, { onConflict: 'id' });
+          }
+        }
+      } catch (err) {
+        console.error('[Settings] Failed to load from Supabase:', err);
+        if (localData && isMounted) {
+          setSettings(localData);
+        }
+      } finally {
+        if (isMounted) setIsLoaded(true);
+      }
+    };
+
+    fetchSettings();
+
+    // Realtime subscription — push DB changes to all open tabs
+    const channel = supabase
+      .channel('app_settings_realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'app_settings' },
+        (payload) => {
+          if (payload.new && isMounted) {
+            const updated = mapRowToSettings(payload.new);
+            const localData = getLocalSettings();
+            // Only apply if DB is newer or equal to local
+            if ((updated._updatedAt || 0) >= (localData?._updatedAt || 0)) {
+              setSettings(updated);
+              saveLocalSettings(updated);
+            }
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      isMounted = false;
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  const updateSettings = async (newSettings: Partial<GlobalSettings>) => {
+    const now = Date.now();
+    const merged: GlobalSettings = { ...settings, ...newSettings, _updatedAt: now };
+    
+    // 1. Update React state immediately
+    setSettings(merged);
+    
+    // 2. Persist to localStorage immediately (always works)
+    saveLocalSettings(merged);
+
+    // 3. Try to persist to Supabase
+    try {
+      const { error } = await supabase.from('app_settings').upsert({
+        id: 1,
+        departments: merged.departments,
+        visitor_purposes: merged.visitorPurposes,
+        meeting_duration_max_hours: merged.meetingDurationMaxHours,
+        company_name: merged.companyName,
+        company_logo: merged.companyLogo,
+        updated_at: new Date(now).toISOString(),
+      }, { onConflict: 'id' });
+
+      if (error) {
+        console.warn('[Settings] Supabase write failed (RLS?):', error.message, '— saved to localStorage only');
+      }
+    } catch (err) {
+      console.warn('[Settings] Supabase unreachable — saved to localStorage only:', err);
+    }
   };
 
   return (
-    <SettingsContext.Provider value={{ settings, updateSettings }}>
+    <SettingsContext.Provider value={{ settings, updateSettings, isLoaded }}>
       {children}
     </SettingsContext.Provider>
   );

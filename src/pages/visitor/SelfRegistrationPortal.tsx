@@ -1,11 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { CheckCircle } from 'lucide-react';
 import { useVisitor } from '../../context/VisitorContext';
+import { useAppUsers } from '../../context/UserContext';
+import { useSettings } from '../../context/SettingsContext';
 
 import { Button } from '../../components/ui/Button';
 
 export const SelfRegistrationPortal: React.FC = () => {
   const { registerVisitor, getVisitorHistory } = useVisitor();
+  const { users } = useAppUsers();
+  const { settings } = useSettings();
   
   const [formData, setFormData] = useState({
     name: '',
@@ -22,7 +26,6 @@ export const SelfRegistrationPortal: React.FC = () => {
   const [isSuccess, setIsSuccess] = useState(false);
   const [error, setError] = useState('');
   const [welcomeBack, setWelcomeBack] = useState('');
-
   // Smart Duplicate Detection
   useEffect(() => {
     if (formData.mobile.length >= 10) {
@@ -48,10 +51,43 @@ export const SelfRegistrationPortal: React.FC = () => {
     }
   }, [formData.mobile]);
 
-  // Sample data for dropdowns (this would typically come from context or backend)
-  const departments = ['IT Support', 'HR & Admin', 'Operations', 'Finance', 'Executive', 'Maintenance'];
-  const employees = ['John Doe', 'Sarah Smith', 'Michael Chen', 'Emma Wilson', 'David Kumar'];
-  const purposes = ['Meeting', 'Interview', 'Delivery', 'Maintenance', 'Personal', 'Other'];
+  // All active host users from User Management
+  const activeHosts = React.useMemo(() =>
+    users.filter(u => u.isActive && (u.role === 'EMPLOYEE' || u.role === 'ADMIN' || u.role === 'HR'))
+  , [users]);
+
+  // Departments from master — filtered to only those that have at least one active host
+  const departments = settings.departments;
+
+  // Hosts filtered by selected department
+  const filteredHosts = React.useMemo(() => {
+    if (!formData.department) return activeHosts;
+    return activeHosts.filter(u => u.department === formData.department);
+  }, [activeHosts, formData.department]);
+
+  // When host is selected → auto-fill department
+  const handleHostChange = (hostName: string) => {
+    const host = activeHosts.find(u => u.name === hostName);
+    setFormData(prev => ({
+      ...prev,
+      employeeToMeet: hostName,
+      // Auto-fill department if host has one and no dept selected yet
+      department: host?.department || prev.department,
+    }));
+  };
+
+  // When department changes → clear host if host doesn't belong to new dept
+  const handleDepartmentChange = (dept: string) => {
+    const currentHost = activeHosts.find(u => u.name === formData.employeeToMeet);
+    const hostStillValid = currentHost && (!currentHost.department || currentHost.department === dept);
+    setFormData(prev => ({
+      ...prev,
+      department: dept,
+      employeeToMeet: hostStillValid ? prev.employeeToMeet : '',
+    }));
+  };
+
+  const purposes = settings.visitorPurposes.length > 0 ? settings.visitorPurposes : ['Meeting', 'Interview', 'Delivery', 'Maintenance', 'Personal', 'Other'];
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -74,7 +110,7 @@ export const SelfRegistrationPortal: React.FC = () => {
       // Small delay to prevent rapid accidental double taps
       await new Promise(resolve => setTimeout(resolve, 500));
       
-      registerVisitor({
+      await registerVisitor({
         name: formData.name,
         company: formData.company,
         mobile: formData.mobile,
@@ -177,28 +213,32 @@ export const SelfRegistrationPortal: React.FC = () => {
               required
             />
 
-            <label style={{ fontSize: '14px', fontWeight: 500, color: '#374151', marginBottom: '4px' }}>Department to Visit *</label>
-            <select 
+            <label style={{ fontSize: '14px', fontWeight: 500, color: '#374151', marginBottom: '4px' }}>Host / Employee *</label>
+            <select
               className="ui-input-focus"
-              value={formData.department} 
-              onChange={e => setFormData({...formData, department: e.target.value})}
+              value={formData.employeeToMeet}
+              onChange={e => handleHostChange(e.target.value)}
+              style={selectStyle}
+              required
+            >
+              <option value="" disabled>Select Employee</option>
+              {filteredHosts.map(u => (
+                <option key={u.id} value={u.name}>
+                  {u.name}{u.department ? ` — ${u.department}` : ''}
+                </option>
+              ))}
+            </select>
+
+            <label style={{ fontSize: '14px', fontWeight: 500, color: '#374151', marginBottom: '4px' }}>Department to Visit *</label>
+            <select
+              className="ui-input-focus"
+              value={formData.department}
+              onChange={e => handleDepartmentChange(e.target.value)}
               style={selectStyle}
               required
             >
               <option value="" disabled>Select Department</option>
               {departments.map(d => <option key={d} value={d}>{d}</option>)}
-            </select>
-
-            <label style={{ fontSize: '14px', fontWeight: 500, color: '#374151', marginBottom: '4px' }}>Host / Employee *</label>
-            <select 
-              className="ui-input-focus"
-              value={formData.employeeToMeet} 
-              onChange={e => setFormData({...formData, employeeToMeet: e.target.value})}
-              style={selectStyle}
-              required
-            >
-              <option value="" disabled>Select Employee</option>
-              {employees.map(e => <option key={e} value={e}>{e}</option>)}
             </select>
 
             <label style={{ fontSize: '14px', fontWeight: 500, color: '#374151', marginBottom: '4px' }}>Purpose of Visit *</label>

@@ -1,45 +1,65 @@
 /* src/css/header.css */
 .ui-layout-header {
-  height: 60px;
+  height: 64px; /* Header height 64px */
   padding: 0 1.5rem;
   border-bottom: 1px solid var(--border-color);
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
   align-items: center;
-  gap: 1.5rem;
+  gap: 1rem;
   background-color: var(--bg-card);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
   position: sticky;
   top: 0;
   z-index: 30;
   box-shadow: var(--shadow-sm);
 }
 
-/* For browsers that support #RRGGBBAA hex */
-@supports (backdrop-filter: blur(12px)) {
-  .ui-layout-header {
-    background-color: color-mix(in srgb, var(--bg-card) 85%, transparent);
-  }
+.ui-header-left {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.ui-header-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 13px;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.ui-header-breadcrumb span.active {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.ui-header-right {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
 }
 
 .ui-theme-toggle {
   display: flex;
   gap: 0.25rem;
-  padding: 0.25rem;
-  background-color: var(--bg-input);
+  padding: 0.2rem;
+  background-color: var(--bg-main);
   border-radius: var(--radius-md);
   border: 1px solid var(--border-color);
 }
 
 .ui-theme-toggle button {
-  padding: 0.5rem;
+  padding: 0.35rem 0.5rem;
   border-radius: var(--radius-sm);
   border: none;
   background-color: transparent;
   color: var(--text-muted);
   cursor: pointer;
   transition: all var(--transition-fast);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .ui-theme-toggle button:hover {
@@ -48,36 +68,51 @@
 
 .ui-theme-toggle button.active {
   background-color: var(--bg-card);
-  color: var(--text-primary);
+  color: var(--primary-color);
   box-shadow: var(--shadow-sm);
 }
 
 .ui-search-box {
   position: relative;
-  width: 300px;
+  width: 260px;
 }
 
 .ui-search-box input {
   width: 100%;
-  padding: 0.6rem 1rem 0.6rem 2.5rem;
-  border-radius: var(--radius-full);
-  background-color: var(--bg-input);
+  height: 38px; /* Height 38px */
+  padding: 0 0.85rem 0 2.25rem;
+  border-radius: var(--radius-md); /* Radius 10px */
+  background-color: var(--bg-main);
   border: 1px solid var(--border-color);
   color: var(--text-primary);
+  font-size: 13px;
   outline: none;
   transition: all var(--transition-fast);
-  box-shadow: var(--shadow-sm);
 }
 
 .ui-search-box input:focus {
   border-color: var(--primary-color);
-  box-shadow: 0 0 0 3px var(--bg-primary-light);
+  box-shadow: 0 0 0 2px var(--bg-primary-light);
 }
 
 .ui-search-icon {
   position: absolute;
-  left: 0.85rem;
+  left: 0.75rem;
   top: 50%;
   transform: translateY(-50%);
   color: var(--text-muted);
+  width: 16px;
+  height: 16px;
+}
+
+@media (max-width: 1024px) {
+  .ui-layout.role-employee .ui-layout-header {
+    display: none !important;
+  }
+  .ui-layout.role-employee .ui-layout-sidebar {
+    display: none !important;
+  }
+  .ui-layout.role-employee .ui-layout-content {
+    padding: 0 !important;
+  }
 }

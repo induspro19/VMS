@@ -1,83 +1,36 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useVisitor } from '../../context/VisitorContext';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
-import { Clock as ClockIcon, BarChart3, Activity } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { AlertBanner } from '../../components/ui/AlertBanner';
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { AuditTimelineModal } from '../../components/ui/AuditTimelineModal';
+import { Users, UserCheck, CheckCircle2, Clock, XCircle } from 'lucide-react';
+import { ERPKpiCard } from '../../components/ui/ERPKpiCard';
+import { useNavigate } from 'react-router-dom';
 
 export const AdminDashboard: React.FC = () => {
   const { visitors } = useVisitor();
-  const [time, setTime] = useState(new Date());
+  const navigate = useNavigate();
   const [timelineVisitorId, setTimelineVisitorId] = useState<string | null>(null);
 
-  useEffect(() => {
-    const timer = setInterval(() => setTime(new Date()), 1000);
-    return () => clearInterval(timer);
-  }, []);
-
-  const { todaysVisitors, currentlyInside, completedVisits, advancedStats } = useMemo(() => {
+  const { todaysVisitors, currentlyInside, readyForExit, completedVisits, rejectedVisits, pendingVisits } = useMemo(() => {
     const today = new Date().toDateString();
     const todayVisits = visitors.filter(v => new Date(v.registrationTime).toDateString() === today);
-    const inside = todayVisits.filter(v => v.status === 'INSIDE' || v.status === 'READY_FOR_EXIT');
+    const inside = todayVisits.filter(v => v.status === 'INSIDE' && !v.meetingCompleted && !v.readyForExit);
+    const readyExit = todayVisits.filter(v => v.status === 'READY_FOR_EXIT' || (v.status === 'INSIDE' && (v.meetingCompleted || v.readyForExit)));
     const completed = todayVisits.filter(v => v.status === 'COMPLETED');
-    
-    // Advanced Analytics
-    let totalMeetingMs = 0, meetingCount = 0;
-    let totalStayMs = 0, stayCount = 0;
-    let repeatCount = 0;
-    let rejectedCount = 0;
-    let pendingCount = 0;
-    const hourMap: Record<number, number> = {};
-
-    todayVisits.forEach(v => {
-      // Peak hour
-      const h = new Date(v.registrationTime).getHours();
-      hourMap[h] = (hourMap[h] || 0) + 1;
-      
-      // Statuses
-      if (v.status === 'REJECTED') rejectedCount++;
-      if (v.status === 'PENDING_APPROVAL') pendingCount++;
-      
-      // Durations
-      if (v.entryTime && v.meetingCompletedTime) {
-        totalMeetingMs += new Date(v.meetingCompletedTime).getTime() - new Date(v.entryTime).getTime();
-        meetingCount++;
-      }
-      if (v.entryTime && v.exitTime) {
-        totalStayMs += new Date(v.exitTime).getTime() - new Date(v.entryTime).getTime();
-        stayCount++;
-      }
-      
-      // Repeat? (check if they have previous visits before today)
-      const pastVisits = visitors.filter(pv => pv.mobile === v.mobile && new Date(pv.registrationTime).toDateString() !== today);
-      if (pastVisits.length > 0) repeatCount++;
-    });
-
-    let peakHourStr = 'N/A';
-    if (Object.keys(hourMap).length > 0) {
-      const peakHour = parseInt(Object.keys(hourMap).reduce((a, b) => hourMap[parseInt(a)] > hourMap[parseInt(b)] ? a : b));
-      peakHourStr = `${peakHour}:00 - ${peakHour + 1}:00`;
-    }
-
-    const avgMeetingStr = meetingCount > 0 ? `${Math.round(totalMeetingMs / meetingCount / 60000)} mins` : 'N/A';
-    const avgStayStr = stayCount > 0 ? `${Math.round(totalStayMs / stayCount / 60000)} mins` : 'N/A';
-    const repeatPct = todayVisits.length > 0 ? Math.round((repeatCount / todayVisits.length) * 100) + '%' : '0%';
-    const rejectPct = todayVisits.length > 0 ? Math.round((rejectedCount / todayVisits.length) * 100) + '%' : '0%';
+    const rejected = todayVisits.filter(v => v.status === 'REJECTED');
+    const pending = todayVisits.filter(v => v.status === 'PENDING_APPROVAL');
 
     return { 
       todaysVisitors: todayVisits, 
       currentlyInside: inside, 
+      readyForExit: readyExit,
       completedVisits: completed,
-      advancedStats: {
-        avgMeeting: avgMeetingStr,
-        avgStay: avgStayStr,
-        peakHour: peakHourStr,
-        repeatPct,
-        rejectPct,
-        pendingCount
-      }
+      rejectedVisits: rejected,
+      pendingVisits: pending
     };
   }, [visitors]);
 
@@ -87,7 +40,7 @@ export const AdminDashboard: React.FC = () => {
       acc[v.department] = (acc[v.department] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);
-    return Object.keys(deptMap).map(k => ({ name: k || 'Other', value: deptMap[k] }));
+    return Object.keys(deptMap).map(k => ({ name: k || 'Other', count: deptMap[k] })).sort((a, b) => b.count - a.count);
   }, [todaysVisitors]);
 
   // Chart Data: Employee Analytics
@@ -96,201 +49,224 @@ export const AdminDashboard: React.FC = () => {
       acc[v.employeeToMeet] = (acc[v.employeeToMeet] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);
-    return Object.keys(empMap).map(k => ({ name: k, value: empMap[k] })).sort((a,b) => b.value - a.value).slice(0, 5);
+    return Object.keys(empMap).map(k => ({ name: k, count: empMap[k] })).sort((a,b) => b.count - a.count);
   }, [todaysVisitors]);
 
-  const COLORS = ['var(--success-color)', 'var(--info-color)', 'var(--warning-color)', 'var(--primary-color)', 'var(--danger-color)'];
+  // Chart Data: Trend line
+  const trendData = [
+    { time: '09:00', visitors: 12 },
+    { time: '10:00', visitors: 25 },
+    { time: '11:00', visitors: 40 },
+    { time: '12:00', visitors: 30 },
+    { time: '13:00', visitors: 15 },
+    { time: '14:00', visitors: 35 },
+    { time: '15:00', visitors: 20 },
+  ];
 
   return (
-    <div className="animate-fade-in" style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+    <div style={{ padding: '1rem 1.5rem 1.5rem 1.5rem', maxWidth: '1400px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
       
-      {/* Header Row */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexShrink: 0 }}>
-        <div>
-          <h1 style={{ fontSize: '24px', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <BarChart3 size={24} style={{ color: 'var(--primary-color)' }} />
-            Admin Overview Command Center
-          </h1>
-          <div style={{ fontSize: '13px', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.25rem' }}>
-            Enterprise Visitor Management Analytics
-          </div>
+      {/* Alerts Row (If Active) */}
+      {((currentlyInside.length + readyForExit.length) > 0 || pendingVisits.length > 0 || rejectedVisits.length > 0) && (
+        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+          {(currentlyInside.length + readyForExit.length) > 0 && <AlertBanner variant="info">{currentlyInside.length + readyForExit.length} visitors currently inside premises</AlertBanner>}
+          {pendingVisits.length > 0 && <AlertBanner variant="warning">{pendingVisits.length} pending approvals</AlertBanner>}
+          {rejectedVisits.length > 0 && <AlertBanner variant="danger">{rejectedVisits.length} rejected visits today</AlertBanner>}
         </div>
-        <div style={{ fontSize: '13px', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <ClockIcon size={14} /> {time.toLocaleTimeString()} • {time.toLocaleDateString()}
-        </div>
-      </div>
+      )}
 
-      {/* KPI Cards Row (4 cards) */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.75rem', marginBottom: '1rem', flexShrink: 0 }}>
-        <div className="ui-card" style={{ padding: '0.75rem', height: '84px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
-          <div style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 500, textTransform: 'uppercase', textAlign: 'center' }}>Today's Visitors</div>
-          <div style={{ fontSize: '28px', fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1, marginTop: '0.25rem' }}>{todaysVisitors.length}</div>
-        </div>
-        <div className="ui-card" style={{ padding: '0.75rem', height: '84px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
-          <div style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 500, textTransform: 'uppercase', textAlign: 'center' }}>Currently Inside</div>
-          <div style={{ fontSize: '28px', fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1, marginTop: '0.25rem' }}>{currentlyInside.length}</div>
-        </div>
-        <div className="ui-card" style={{ padding: '0.75rem', height: '84px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
-          <div style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 500, textTransform: 'uppercase', textAlign: 'center' }}>Completed Visits</div>
-          <div style={{ fontSize: '28px', fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1, marginTop: '0.25rem' }}>{completedVisits.length}</div>
-        </div>
-        <div className={`ui-card ${currentlyInside.length > 0 ? 'border-danger-color bg-danger-light' : ''}`} style={{ padding: '0.75rem', height: '84px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
-          <div style={{ fontSize: '12px', color: currentlyInside.length > 0 ? 'var(--danger-color)' : 'var(--text-secondary)', fontWeight: 500, textTransform: 'uppercase', textAlign: 'center' }}>Emergency Evac</div>
-          <div style={{ fontSize: '28px', fontWeight: 700, color: currentlyInside.length > 0 ? 'var(--danger-color)' : 'var(--text-primary)', lineHeight: 1, marginTop: '0.25rem' }}>{currentlyInside.length}</div>
-        </div>
-      </div>
-
-
-      {/* Advanced KPIs Row (6 cards) */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '0.75rem', marginBottom: '1rem', flexShrink: 0 }}>
-        <div className="ui-card" style={{ padding: '0.75rem', height: '64px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-          <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: 500, textTransform: 'uppercase' }}>Avg Meeting Time</div>
-          <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--primary-color)' }}>{advancedStats.avgMeeting}</div>
-        </div>
-        <div className="ui-card" style={{ padding: '0.75rem', height: '64px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-          <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: 500, textTransform: 'uppercase' }}>Avg Visitor Stay</div>
-          <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--info-color)' }}>{advancedStats.avgStay}</div>
-        </div>
-        <div className="ui-card" style={{ padding: '0.75rem', height: '64px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-          <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: 500, textTransform: 'uppercase' }}>Peak Hour</div>
-          <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text-primary)' }}>{advancedStats.peakHour}</div>
-        </div>
-        <div className="ui-card" style={{ padding: '0.75rem', height: '64px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-          <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: 500, textTransform: 'uppercase' }}>Repeat Visitors</div>
-          <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--success-color)' }}>{advancedStats.repeatPct}</div>
-        </div>
-        <div className="ui-card" style={{ padding: '0.75rem', height: '64px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-          <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: 500, textTransform: 'uppercase' }}>Rejected %</div>
-          <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--danger-color)' }}>{advancedStats.rejectPct}</div>
-        </div>
-        <div className="ui-card" style={{ padding: '0.75rem', height: '64px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-          <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: 500, textTransform: 'uppercase' }}>Pending Approval</div>
-          <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--warning-color)' }}>{advancedStats.pendingCount}</div>
-        </div>
-      </div>
-
-      {/* Main Content Area: Charts & Table splitting vertical space */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', flex: 1, minHeight: 0 }}>
+      {/* Top Summary KPI Cards (Enterprise ERP Style) */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: '1rem' }}>
         
-        {/* Charts Row: Takes roughly 40% of the remaining height */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', flexShrink: 0, height: '280px' }}>
-          
-          <Card style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
-            <CardHeader style={{ padding: '0.75rem 1rem', borderBottom: '1px solid var(--border-color)', flexShrink: 0 }}>
-              <CardTitle className="flex items-center gap-2" style={{ fontSize: '14px' }}>
-                <BarChart3 size={16} /> Department Distribution
-              </CardTitle>
-            </CardHeader>
-            <CardContent style={{ flex: 1, padding: '0.5rem', minHeight: 0 }}>
-              {deptData.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={deptData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                    <XAxis dataKey="name" stroke="var(--text-muted)" fontSize={11} tickLine={false} axisLine={false} />
-                    <YAxis stroke="var(--text-muted)" fontSize={11} tickLine={false} axisLine={false} />
-                    <Tooltip cursor={{ fill: 'var(--bg-card-hover)' }} contentStyle={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)', borderRadius: 'var(--radius-md)', fontSize: '12px' }} />
-                    <Bar dataKey="value" fill="var(--primary-color)" radius={[4, 4, 0, 0]} maxBarSize={40} />
-                  </BarChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="flex items-center justify-center h-full text-muted text-sm">No data available</div>
-              )}
-            </CardContent>
-          </Card>
+        <ERPKpiCard
+          title="Visitors Today"
+          value={todaysVisitors.length}
+          subtitle="Total registered today"
+          footer="Open History →"
+          footerStatus="neutral"
+          badgeText="TODAY"
+          badgeVariant="today"
+          icon={<Users size={16} />}
+          iconBg="#EFF6FF"
+          iconColor="#2563EB"
+          onClick={() => navigate('/admin/history')}
+        />
 
-          <Card style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
-            <CardHeader style={{ padding: '0.75rem 1rem', borderBottom: '1px solid var(--border-color)', flexShrink: 0 }}>
-              <CardTitle className="flex items-center gap-2" style={{ fontSize: '14px' }}>
-                <Activity size={16} /> Top Hosts Today
-              </CardTitle>
-            </CardHeader>
-            <CardContent style={{ flex: 1, padding: '0.5rem', minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-              {empData.length > 0 ? (
-                <>
-                  <div style={{ flex: 1, minHeight: 0 }}>
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie data={empData} innerRadius="60%" outerRadius="90%" paddingAngle={5} dataKey="value" stroke="none">
-                          {empData.map((_entry, index) => (
-                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                          ))}
-                        </Pie>
-                        <Tooltip contentStyle={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)', borderRadius: 'var(--radius-md)', fontSize: '12px' }} itemStyle={{ color: 'var(--text-primary)' }} />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  </div>
-                  <div className="flex justify-center gap-3 mt-2 flex-wrap flex-shrink-0" style={{ paddingBottom: '0.5rem' }}>
-                    {empData.map((entry, index) => (
-                      <div key={entry.name} className="flex items-center gap-1 text-xs text-secondary font-medium">
-                        <div style={{ width: 10, height: 10, borderRadius: 2, backgroundColor: COLORS[index % COLORS.length] }}></div>
-                        {entry.name}
-                      </div>
-                    ))}
-                  </div>
-                </>
-              ) : (
-                <div className="flex items-center justify-center h-full text-muted text-sm">No data available</div>
-              )}
-            </CardContent>
-          </Card>
+        <ERPKpiCard
+          title="Waiting Approval"
+          value={pendingVisits.length}
+          subtitle="Pending host response"
+          footer="Open Queue →"
+          footerStatus="warning"
+          badgeText="PENDING"
+          badgeVariant="warning"
+          icon={<Clock size={16} />}
+          iconBg="#FFEDD5"
+          iconColor="#EA580C"
+          onClick={() => navigate('/admin/history')}
+        />
 
-        </div>
+        <ERPKpiCard
+          title="Inside Premises"
+          value={currentlyInside.length}
+          subtitle="Meetings in progress"
+          footer="Live Gate Count"
+          footerStatus="positive"
+          badgeText="INSIDE"
+          badgeVariant="active"
+          icon={<UserCheck size={16} />}
+          iconBg="#DBEAFE"
+          iconColor="#2563EB"
+          onClick={() => navigate('/admin/history')}
+        />
 
-        {/* Table Row: Takes the rest of the height, fully scrollable internally */}
-        <div className="ui-card" style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
-          <div style={{ padding: '0.75rem 1rem', borderBottom: '1px solid var(--border-color)', backgroundColor: 'var(--bg-card-hover)', fontWeight: 600, fontSize: '14px', flexShrink: 0 }}>
-            Latest Visitors (Today)
-          </div>
-          <div style={{ flex: 1, overflowY: 'auto' }}>
-            <table className="ui-table" style={{ margin: 0, width: '100%' }}>
-              <thead>
-                <tr>
-                  <th style={{ padding: '0.5rem 1rem' }}>Visitor</th>
-                  <th style={{ padding: '0.5rem 1rem' }}>Mobile</th>
-                  <th style={{ padding: '0.5rem 1rem' }}>Host</th>
-                  <th style={{ padding: '0.5rem 1rem' }}>Status</th>
-                  <th style={{ padding: '0.5rem 1rem', textAlign: 'right' }}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {todaysVisitors.length === 0 && (
-                  <tr>
-                    <td colSpan={5} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
-                      No visitors today
-                    </td>
-                  </tr>
-                )}
-                {todaysVisitors.map(v => (
-                  <tr key={v.id}>
-                    <td>
-                      <div style={{ fontWeight: 500 }}>{v.name}</div>
-                      <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{v.company}</div>
-                    </td>
-                    <td style={{ fontSize: '13px' }}>{v.mobile}</td>
-                    <td style={{ fontSize: '13px' }}>{v.employeeToMeet}</td>
-                    <td>
-                      <Badge variant={v.status === 'COMPLETED' ? 'default' : v.status === 'INSIDE' ? 'success' : v.status === 'REJECTED' ? 'danger' : 'warning'}>
-                        {v.status.replace('_', ' ')}
-                      </Badge>
-                    </td>
-                    <td style={{ textAlign: 'right' }}>
-                      <Button variant="ghost" size="sm" onClick={() => setTimelineVisitorId(v.id)} style={{ fontSize: '12px', height: '28px', padding: '0 0.5rem' }}>
-                        Timeline
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        <ERPKpiCard
+          title="Ready For Exit"
+          value={readyForExit.length}
+          subtitle="Awaiting gate checkout"
+          footer="Open Checkout →"
+          footerStatus="warning"
+          badgeText="READY"
+          badgeVariant="warning"
+          icon={<Clock size={16} />}
+          iconBg="#FEF3C7"
+          iconColor="#D97706"
+          onClick={() => navigate('/admin/history')}
+        />
+
+        <ERPKpiCard
+          title="Completed Today"
+          value={completedVisits.length}
+          subtitle="Checked out successfully"
+          footer="Target Achieved"
+          footerStatus="positive"
+          badgeText="GOOD"
+          badgeVariant="good"
+          icon={<CheckCircle2 size={16} />}
+          iconBg="#DCFCE7"
+          iconColor="#059669"
+          onClick={() => navigate('/admin/history')}
+        />
+
+        <ERPKpiCard
+          title="Rejected"
+          value={rejectedVisits.length}
+          subtitle="Denied gate access"
+          footer={rejectedVisits.length > 0 ? "▼ Security Review" : "All Clear"}
+          footerStatus={rejectedVisits.length > 0 ? "negative" : "positive"}
+          badgeText="BLOCKED"
+          badgeVariant="danger"
+          icon={<XCircle size={16} />}
+          iconBg="#FEE2E2"
+          iconColor="#DC2626"
+          onClick={() => navigate('/admin/history')}
+        />
 
       </div>
 
-      <AuditTimelineModal 
-        isOpen={!!timelineVisitorId} 
-        onClose={() => setTimelineVisitorId(null)} 
-        visitorId={timelineVisitorId} 
+      {/* 3. Middle Detail Cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.5rem' }}>
+        
+        {/* Recent Visitors */}
+        <Card variant="info">
+          <CardHeader style={{ paddingBottom: '0.5rem' }}>
+            <CardTitle>Recent Activity</CardTitle>
+          </CardHeader>
+          <CardContent style={{ padding: '1rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              {todaysVisitors.slice(0, 5).map(v => (
+                <div key={v.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '0.75rem', borderBottom: '1px solid var(--border-color)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>{v.name}</div>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{v.company} &bull; Meeting: {v.employeeToMeet}</div>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <Badge variant={v.status === 'COMPLETED' ? 'default' : v.status === 'INSIDE' ? 'success' : 'warning'}>
+                      {v.status}
+                    </Badge>
+                    <Button variant="ghost" size="sm" onClick={() => setTimelineVisitorId(v.id)}>Audit</Button>
+                  </div>
+                </div>
+              ))}
+              {todaysVisitors.length === 0 && <div style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>No activity today</div>}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Department Analytics */}
+        <Card>
+          <CardHeader style={{ paddingBottom: '0.5rem' }}>
+            <CardTitle>Visits by Department</CardTitle>
+          </CardHeader>
+          <CardContent style={{ padding: '1rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              {deptData.slice(0, 5).map(d => (
+                <div key={d.name} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>{d.name}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <div style={{ width: '100px', height: '8px', backgroundColor: 'var(--bg-secondary)', borderRadius: '4px', overflow: 'hidden' }}>
+                      <div style={{ width: `${(d.count / (todaysVisitors.length || 1)) * 100}%`, height: '100%', backgroundColor: 'var(--primary-color)' }} />
+                    </div>
+                    <span style={{ fontSize: '0.875rem', fontWeight: 600, width: '20px', textAlign: 'right' }}>{d.count}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Top Hosts Analytics */}
+        <Card>
+          <CardHeader style={{ paddingBottom: '0.5rem' }}>
+            <CardTitle>Top Host Employees</CardTitle>
+          </CardHeader>
+          <CardContent style={{ padding: '1rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              {empData.slice(0, 5).map(e => (
+                <div key={e.name} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>{e.name}</span>
+                  <Badge variant="info">{e.count} visits</Badge>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+      </div>
+
+      {/* 4. Visitor Traffic Chart */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Today's Gate Traffic Flow</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div style={{ width: '100%', height: 250 }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={trendData}>
+                <defs>
+                  <linearGradient id="colorVis" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#2563eb" stopOpacity={0.8}/>
+                    <stop offset="95%" stopColor="#2563eb" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <XAxis dataKey="time" stroke="#64748b" fontSize={12} />
+                <YAxis stroke="#64748b" fontSize={12} />
+                <Tooltip />
+                <Area type="monotone" dataKey="visitors" stroke="#2563eb" fillOpacity={1} fill="url(#colorVis)" />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </CardContent>
+      </Card>
+
+      <AuditTimelineModal
+        isOpen={!!timelineVisitorId}
+        onClose={() => setTimelineVisitorId(null)}
+        visitorId={timelineVisitorId}
       />
+
     </div>
   );
 };

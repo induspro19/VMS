@@ -1,11 +1,13 @@
 import React from 'react';
 import { clsx } from 'clsx';
 
-interface CardProps extends React.HTMLAttributes<HTMLDivElement> {}
+interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
+  variant?: 'primary' | 'success' | 'warning' | 'danger' | 'info';
+}
 
 export const Card = React.forwardRef<HTMLDivElement, CardProps>(
-  ({ className, children, ...props }, ref) => (
-    <div ref={ref} className={clsx('ui-card', className)} {...props}>
+  ({ className, variant, children, ...props }, ref) => (
+    <div ref={ref} className={clsx('ui-card', variant && `ui-card-${variant}`, className)} {...props}>
       {children}
     </div>
   )

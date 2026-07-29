@@ -17,6 +17,7 @@ export const SelfRegistrationPortal: React.FC = () => {
     mobile: '',
     department: '',
     employeeToMeet: '',
+    hostEmployeeId: '',
     purpose: '',
     otherPurpose: '',
     vehicleNumber: ''
@@ -71,6 +72,7 @@ export const SelfRegistrationPortal: React.FC = () => {
     setFormData(prev => ({
       ...prev,
       employeeToMeet: hostName,
+      hostEmployeeId: host?.id || '',
       // Auto-fill department if host has one and no dept selected yet
       department: host?.department || prev.department,
     }));
@@ -84,6 +86,7 @@ export const SelfRegistrationPortal: React.FC = () => {
       ...prev,
       department: dept,
       employeeToMeet: hostStillValid ? prev.employeeToMeet : '',
+      hostEmployeeId: hostStillValid ? prev.hostEmployeeId : '',
     }));
   };
 
@@ -116,6 +119,7 @@ export const SelfRegistrationPortal: React.FC = () => {
         mobile: formData.mobile,
         department: formData.department,
         employeeToMeet: formData.employeeToMeet,
+        hostEmployeeId: formData.hostEmployeeId,
         purpose: formData.purpose === 'Other' ? formData.otherPurpose : formData.purpose,
         vehicleNumber: formData.vehicleNumber
       });
@@ -123,7 +127,7 @@ export const SelfRegistrationPortal: React.FC = () => {
       setIsSuccess(true);
       // Reset form
       setFormData({
-        name: '', company: '', mobile: '', department: '', employeeToMeet: '', purpose: '', otherPurpose: '', vehicleNumber: ''
+        name: '', company: '', mobile: '', department: '', employeeToMeet: '', hostEmployeeId: '', purpose: '', otherPurpose: '', vehicleNumber: ''
       });
     } catch (err: any) {
       setError(err.message || 'An error occurred during registration. Please try again.');

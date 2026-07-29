@@ -41,7 +41,7 @@ export const registerPushSubscription = async (employeeId: string) => {
         subscription_json: subJson,
         last_seen: new Date().toISOString()
       }, {
-        onConflict: 'employee_id, (subscription_json->>\'endpoint\')'
+        onConflict: 'idx_push_subscriptions_employee_endpoint'
       });
 
       if (error) {

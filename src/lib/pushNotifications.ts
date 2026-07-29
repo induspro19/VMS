@@ -35,14 +35,31 @@ export const registerPushSubscription = async (employeeId: string) => {
 
     if (subscription) {
       const subJson = subscription.toJSON();
-      
-      const { error } = await supabase.from('push_subscriptions').upsert({
-        employee_id: employeeId,
-        subscription_json: subJson,
-        last_seen: new Date().toISOString()
-      }, {
-        onConflict: 'idx_push_subscriptions_employee_endpoint'
-      });
+      // Manual upsert to avoid PostgREST JSONB index issues
+      const { data: existing } = await supabase
+        .from('push_subscriptions')
+        .select('id')
+        .eq('employee_id', employeeId)
+        .eq('subscription_json->>endpoint', subJson.endpoint)
+        .maybeSingle();
+
+      let error;
+      if (existing) {
+        const res = await supabase
+          .from('push_subscriptions')
+          .update({ last_seen: new Date().toISOString() })
+          .eq('id', existing.id);
+        error = res.error;
+      } else {
+        const res = await supabase
+          .from('push_subscriptions')
+          .insert({
+            employee_id: employeeId,
+            subscription_json: subJson,
+            last_seen: new Date().toISOString()
+          });
+        error = res.error;
+      }
 
       if (error) {
         console.error('Failed to save push subscription to Supabase:', error);

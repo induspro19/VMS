@@ -278,6 +278,27 @@ export const EmployeeDashboard: React.FC = () => {
         </div>
 
         <div className="hero-right-actions">
+          {('Notification' in window) && Notification.permission === 'granted' && (
+            <button 
+              className="hero-icon-btn" 
+              onClick={async () => {
+                try {
+                  const { registerPushSubscription } = await import('../../lib/pushNotifications');
+                  if (user) {
+                    await registerPushSubscription(user.id);
+                    alert("Sync Successful! Check Database.");
+                  }
+                } catch (e: any) {
+                  alert("Sync Failed: " + e.message);
+                }
+              }}
+              title="Force Sync Notifications"
+              style={{ color: '#059669', backgroundColor: '#D1FAE5' }}
+            >
+              <BellRing size={18} />
+            </button>
+          )}
+
           {('Notification' in window) && Notification.permission !== 'granted' && (
             <button 
               className="hero-icon-btn" 

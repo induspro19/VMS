@@ -46,11 +46,13 @@ export const registerPushSubscription = async (employeeId: string) => {
 
       if (error) {
         console.error('Failed to save push subscription to Supabase:', error);
+        throw error;
       } else {
         console.log('Push subscription saved for employee:', employeeId);
       }
     }
   } catch (error) {
     console.error('Error during push subscription:', error);
+    throw error;
   }
 };

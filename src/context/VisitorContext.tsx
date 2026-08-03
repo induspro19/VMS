@@ -131,7 +131,7 @@ const mapDbToVisitor = (db: any): Visitor => {
     company: db.company || '',
     department: db.department || '',
     employeeToMeet: db.employee_to_meet || db.employeeToMeet || '',
-    hostEmployeeId: db.host_employee_id || db.hostEmployeeId,
+    hostEmployeeId: db.host_employee || db.host_employee_id || db.hostEmployeeId,
     purpose: db.purpose || '',
     vehicleNumber: db.vehicle_number || db.vehicleNumber,
     status: status,
@@ -173,7 +173,7 @@ const mapVisitorToDb = (v: Partial<Visitor>) => {
   if (v.company !== undefined) db.company = v.company;
   if (v.department !== undefined) db.department = v.department;
   if (v.employeeToMeet !== undefined) db.employee_to_meet = v.employeeToMeet;
-  if (v.hostEmployeeId !== undefined) db.host_employee_id = v.hostEmployeeId;
+  if (v.hostEmployeeId !== undefined) db.host_employee = v.hostEmployeeId;
   if (v.purpose !== undefined) db.purpose = v.purpose;
   if (v.vehicleNumber !== undefined) db.vehicle_number = v.vehicleNumber;
   if (v.status !== undefined) db.status = v.status;

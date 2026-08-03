@@ -1,4 +1,4 @@
-import React, { Suspense, lazy } from 'react';
+import React, { Suspense, lazy, useEffect, useRef } from 'react';
 import { HashRouter as BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { UserProvider } from './context/UserContext';
@@ -51,6 +51,66 @@ const Maintenance = lazy(() => import('./pages/fleet/Maintenance').then(m => ({ 
 const FleetReports = lazy(() => import('./pages/fleet/FleetReports').then(m => ({ default: m.FleetReports })));
 const FleetAnalytics = lazy(() => import('./pages/fleet/Analytics').then(m => ({ default: m.FleetAnalytics })));
 
+// ─── AppSyncManager ──────────────────────────────────────────────────────────
+// Zero-render component that wires the three refresh trigger sources:
+//  1. Service Worker postMessage (notification tap on an already-open PWA)
+//  2. document visibilitychange (app foregrounded after being backgrounded)
+//  3. BroadcastChannel messages from other tabs (forwarded from VisitorContext)
+// All three fire the `vms:refresh` custom window event consumed by
+// VisitorContext and EmployeeDashboard independently.
+const THROTTLE_MS = 30_000; // minimum gap between visibility-triggered refreshes
+
+function AppSyncManager() {
+  const lastRefreshRef = useRef<number>(0);
+
+  const fireRefresh = (detail: Record<string, unknown>) => {
+    if (import.meta.env.DEV) {
+      console.debug('[AppSyncManager] Dispatching vms:refresh', detail);
+    }
+    window.dispatchEvent(new CustomEvent('vms:refresh', { detail }));
+  };
+
+  useEffect(() => {
+    // 1. Service Worker → App messages (notification tap)
+    const handleSWMessage = (event: MessageEvent) => {
+      if (event.data?.type === 'REFRESH_APP_DATA') {
+        if (import.meta.env.DEV) {
+          console.debug('[AppSyncManager] SW message received', event.data);
+        }
+        fireRefresh({ source: event.data.source, visitorId: event.data.visitorId, scope: 'employee' });
+      }
+    };
+
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.addEventListener('message', handleSWMessage);
+    }
+
+    // 2. Tab visibility change (throttled)
+    const handleVisibility = () => {
+      if (document.visibilityState !== 'visible') return;
+      const now = Date.now();
+      if (now - lastRefreshRef.current < THROTTLE_MS) return;
+      lastRefreshRef.current = now;
+      if (import.meta.env.DEV) {
+        console.debug('[AppSyncManager] visibilitychange — refreshing');
+      }
+      fireRefresh({ source: 'visibilitychange', scope: 'full' });
+    };
+
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.removeEventListener('message', handleSWMessage);
+      }
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, []);
+
+  return null;
+}
+
+// ─── Route Guards ─────────────────────────────────────────────────────────────
 const ProtectedRoute = ({ children, allowedRole }: { children: React.ReactNode, allowedRole: string | string[] }) => {
   const { user } = useAuth();
   
@@ -101,6 +161,7 @@ function App() {
                       <AuthProvider>
                       <GlobalErrorBoundary>
                     <Suspense fallback={<LoadingScreen />}>
+                      <AppSyncManager />
                       <SmartAlertsEngine />
                       <Routes>
                         {/* Public Routes for Visitors */}

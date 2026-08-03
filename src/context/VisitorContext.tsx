@@ -1,5 +1,6 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabase';
+import { useRealtimeHealth } from '../hooks/useRealtimeHealth';
 
 export type VisitorStatus = 
   | 'PENDING_APPROVAL' 
@@ -88,6 +89,8 @@ interface VisitorContextType {
   updateStatus: (id: string, status: VisitorStatus, actor: string, extra?: Partial<Visitor>, isForceExit?: boolean) => void;
   getVisitorById: (id: string) => Visitor | undefined;
   getVisitorHistory: (mobile: string) => Visitor[];
+  /** Manually trigger a full re-fetch from Supabase (used by AppSyncManager). */
+  refreshVisitors: () => Promise<void>;
 }
 
 export const setVisitorSession = (visitorId: string, sessionId: string) => {
@@ -255,81 +258,195 @@ export const VisitorProvider: React.FC<{ children: React.ReactNode }> = ({ child
     localStorage.setItem('vms_audit', JSON.stringify(auditLogs));
   }, [auditLogs]);
 
-  // Initial Fetch & Realtime Listeners with Supabase
+  // ── Stable full fetch (can be called from any effect/event) ───────────────
+  const isMountedRef = useRef(true);
+
+  const fetchInitialData = useCallback(async () => {
+    try {
+      if (import.meta.env.DEV) console.debug('[VisitorContext] fetchInitialData — full refresh');
+
+      const { data: visitorData, error: visitorError } = await supabase
+        .from('visitors')
+        .select('*')
+        .order('registration_time', { ascending: false });
+
+      if (!visitorError && visitorData && isMountedRef.current) {
+        setVisitors(visitorData.map(mapDbToVisitor));
+        if (import.meta.env.DEV) console.debug('[VisitorContext] Visitors refreshed —', visitorData.length, 'records');
+      }
+
+      const { data: auditData, error: auditError } = await supabase
+        .from('audit_logs')
+        .select('*')
+        .order('timestamp', { ascending: false });
+
+      if (!auditError && auditData && isMountedRef.current) {
+        setAuditLogs(auditData.map(mapDbToAuditLog));
+      }
+    } catch (err) {
+      console.warn('[VisitorContext] Supabase fetch notice (local fallback active):', err);
+    }
+  }, []);
+
+  // ── Scoped fetch: only update visitors for a specific host employee ─────────
+  // Used when vms:refresh carries scope='employee' to avoid a full table scan.
+  const fetchVisitorsForEmployee = useCallback(async (employeeId: string) => {
+    try {
+      if (import.meta.env.DEV) console.debug('[VisitorContext] fetchVisitorsForEmployee —', employeeId);
+
+      const { data, error } = await supabase
+        .from('visitors')
+        .select('*')
+        .eq('host_employee', employeeId)
+        .order('registration_time', { ascending: false })
+        .limit(200);
+
+      if (!error && data && isMountedRef.current) {
+        const incoming = data.map(mapDbToVisitor);
+        setVisitors(prev => {
+          const map = new Map(prev.map(v => [v.id, v]));
+          for (const v of incoming) {
+            // Preserve local sessionId/qrToken set during self-registration
+            const existing = map.get(v.id);
+            map.set(v.id, {
+              ...v,
+              sessionId: v.sessionId || existing?.sessionId,
+              qrToken:   v.qrToken   || existing?.qrToken,
+            });
+          }
+          return Array.from(map.values()).sort(
+            (a, b) => new Date(b.registrationTime).getTime() - new Date(a.registrationTime).getTime()
+          );
+        });
+        if (import.meta.env.DEV) console.debug('[VisitorContext] Scoped refresh done —', incoming.length, 'records');
+      }
+    } catch (err) {
+      console.warn('[VisitorContext] Scoped fetch notice:', err);
+    }
+  }, []);
+
+  // ── Initial data load ─────────────────────────────────────────────────────
   useEffect(() => {
-    let isMounted = true;
+    isMountedRef.current = true;
+    fetchInitialData();
+    return () => { isMountedRef.current = false; };
+  }, [fetchInitialData]);
 
-    const fetchInitialData = async () => {
-      try {
-        const { data: visitorData, error: visitorError } = await supabase
-          .from('visitors')
-          .select('*')
-          .order('registration_time', { ascending: false });
+  // ── BroadcastChannel — sync across tabs ────────────────────────────────────
+  // When a Realtime INSERT fires in one tab, broadcast so sibling tabs also
+  // refresh without relying on their own Realtime connections.
+  const bcRef = useRef<BroadcastChannel | null>(null);
+  const bcThrottleRef = useRef<number>(0);
 
-        if (!visitorError && visitorData && isMounted) {
-          setVisitors(visitorData.map(mapDbToVisitor));
-        }
+  useEffect(() => {
+    if (typeof BroadcastChannel === 'undefined') return;
 
-        const { data: auditData, error: auditError } = await supabase
-          .from('audit_logs')
-          .select('*')
-          .order('timestamp', { ascending: false });
+    const bc = new BroadcastChannel('vms_sync');
+    bcRef.current = bc;
 
-        if (!auditError && auditData && isMounted) {
-          setAuditLogs(auditData.map(mapDbToAuditLog));
-        }
-      } catch (err) {
-        console.warn('Supabase fetch notice (local fallback active):', err);
+    bc.onmessage = (ev) => {
+      if (ev.data?.type !== 'VISITOR_INSERTED') return;
+      // Throttle: one cross-tab refresh per 5 s maximum
+      const now = Date.now();
+      if (now - bcThrottleRef.current < 5_000) return;
+      bcThrottleRef.current = now;
+
+      if (import.meta.env.DEV) {
+        console.debug('[VisitorContext] BroadcastChannel — cross-tab refresh triggered');
+      }
+      // Dispatch into this tab's event loop so EmployeeDashboard also picks it up
+      window.dispatchEvent(new CustomEvent('vms:refresh', { detail: { source: 'broadcast', scope: 'full' } }));
+      fetchInitialData();
+    };
+
+    return () => {
+      bc.close();
+      bcRef.current = null;
+    };
+  }, [fetchInitialData]);
+
+  // ── vms:refresh window event listener ────────────────────────────────────
+  // Fired by AppSyncManager on: SW message (notification tap), visibilitychange.
+  useEffect(() => {
+    const handler = (ev: Event) => {
+      const detail = (ev as CustomEvent).detail as { scope?: string; employeeId?: string; source?: string } | undefined;
+
+      if (import.meta.env.DEV) {
+        console.debug('[VisitorContext] vms:refresh received', detail);
+      }
+
+      if (detail?.scope === 'employee' && detail?.employeeId) {
+        // Targeted: only refresh that employee's visitors
+        fetchVisitorsForEmployee(detail.employeeId);
+      } else {
+        // Full refresh (visibilitychange, reconnect, unknown source)
+        fetchInitialData();
       }
     };
 
-    fetchInitialData();
+    window.addEventListener('vms:refresh', handler);
+    return () => window.removeEventListener('vms:refresh', handler);
+  }, [fetchInitialData, fetchVisitorsForEmployee]);
 
-    // Subscribe to realtime visitor updates
-    const visitorChannel = supabase
-      .channel('public:visitors')
-      .on(
+  // ── Realtime channel — visitors ────────────────────────────────────────────
+  // Handled via useRealtimeHealth for automatic reconnection & backoff.
+  useRealtimeHealth({
+    channelName: 'public:visitors-global',
+    enabled: true,
+    setupListeners: (channel) => {
+      channel.on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'visitors' },
         (payload) => {
           if (payload.eventType === 'INSERT') {
             const newV = mapDbToVisitor(payload.new);
+            if (import.meta.env.DEV) console.debug('[VisitorContext] Realtime INSERT', newV.id);
             setVisitors(prev => {
               const existing = prev.find(v => v.id === newV.id);
-              const preserved = existing ? { ...newV, sessionId: newV.sessionId || existing.sessionId, qrToken: newV.qrToken || existing.qrToken } : newV;
+              const preserved = existing
+                ? { ...newV, sessionId: newV.sessionId || existing.sessionId, qrToken: newV.qrToken || existing.qrToken }
+                : newV;
               return [preserved, ...prev.filter(v => v.id !== newV.id)];
             });
+            // Notify other tabs
+            bcRef.current?.postMessage({ type: 'VISITOR_INSERTED', id: newV.id });
           } else if (payload.eventType === 'UPDATE') {
             const updatedV = mapDbToVisitor(payload.new);
-            setVisitors(prev => prev.map(v => v.id === updatedV.id ? { ...updatedV, sessionId: updatedV.sessionId || v.sessionId, qrToken: updatedV.qrToken || v.qrToken } : v));
+            if (import.meta.env.DEV) console.debug('[VisitorContext] Realtime UPDATE', updatedV.id);
+            setVisitors(prev => prev.map(v =>
+              v.id === updatedV.id
+                ? { ...updatedV, sessionId: updatedV.sessionId || v.sessionId, qrToken: updatedV.qrToken || v.qrToken }
+                : v
+            ));
           } else if (payload.eventType === 'DELETE') {
+            if (import.meta.env.DEV) console.debug('[VisitorContext] Realtime DELETE', payload.old.id);
             setVisitors(prev => prev.filter(v => v.id !== payload.old.id));
           }
         }
-      )
-      .subscribe();
+      );
+    },
+    onReconnect: () => {
+      if (import.meta.env.DEV) console.debug('[VisitorContext] visitors channel reconnected — full refresh');
+      fetchInitialData();
+    },
+  });
 
-    // Subscribe to realtime audit_logs updates
-    const auditChannel = supabase
-      .channel('public:audit_logs')
-      .on(
+  // ── Realtime channel — audit_logs ─────────────────────────────────────────
+  useRealtimeHealth({
+    channelName: 'public:audit-logs-global',
+    enabled: true,
+    setupListeners: (channel) => {
+      channel.on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'audit_logs' },
+        { event: 'INSERT', schema: 'public', table: 'audit_logs' },
         (payload) => {
-          if (payload.eventType === 'INSERT') {
-            const newLog = mapDbToAuditLog(payload.new);
-            setAuditLogs(prev => [newLog, ...prev.filter(l => l.id !== newLog.id)]);
-          }
+          const newLog = mapDbToAuditLog(payload.new);
+          setAuditLogs(prev => [newLog, ...prev.filter(l => l.id !== newLog.id)]);
         }
-      )
-      .subscribe();
-
-    return () => {
-      isMounted = false;
-      supabase.removeChannel(visitorChannel);
-      supabase.removeChannel(auditChannel);
-    };
-  }, []);
+      );
+    },
+    onReconnect: () => { /* audit logs are non-critical; full fetchInitialData handles them */ },
+  });
 
   const addAuditLog = async (
     visitorId: string, 
@@ -601,7 +718,7 @@ export const VisitorProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   return (
-    <VisitorContext.Provider value={{ visitors, auditLogs, registerVisitor, preRegisterVisitor, updateStatus, getVisitorById, getVisitorHistory }}>
+    <VisitorContext.Provider value={{ visitors, auditLogs, registerVisitor, preRegisterVisitor, updateStatus, getVisitorById, getVisitorHistory, refreshVisitors: fetchInitialData }}>
       {children}
     </VisitorContext.Provider>
   );

@@ -72,20 +72,32 @@ self.addEventListener('push', (event) => {
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
 
-  const targetUrl = event.notification.data.url;
+  const targetUrl  = event.notification.data?.url  || '/VMS/';
+  const visitorId  = event.notification.data?.visitorId;
+
+  const refreshMsg = {
+    type:      'REFRESH_APP_DATA',
+    source:    'push-notification',
+    visitorId: visitorId ?? null,
+    timestamp: Date.now(),
+  };
 
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-      // If a window is already open, focus it and navigate
       for (const client of clientList) {
         if (client.url.includes('/VMS/') && 'focus' in client) {
-          client.focus();
-          return client.navigate(targetUrl);
+          // Window already open — focus it, navigate to the deep-link, then tell
+          // the app to refresh state so the visitor appears without a page reload.
+          void client.focus().then((focused) => {
+            focused.navigate(targetUrl);
+            focused.postMessage(refreshMsg);
+          });
+          return;
         }
       }
-      // If no window is open, open a new one
+      // No window open — open a fresh one; it will fetch on mount automatically.
       if (self.clients.openWindow) {
-        return self.clients.openWindow(targetUrl);
+        void self.clients.openWindow(targetUrl);
       }
     })
   );

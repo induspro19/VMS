@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useVisitor } from '../../context/VisitorContext';
 import type { Visitor } from '../../context/VisitorContext';
 import { useAuth } from '../../context/AuthContext';
@@ -8,6 +8,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { updateAppBadge } from '../../lib/badging';
 import { NotificationCenter } from '../../components/NotificationCenter/NotificationCenter';
+import { useRealtimeHealth } from '../../hooks/useRealtimeHealth';
 
 import { ConfirmModal } from '../../components/ui/Modal';
 import { 
@@ -119,20 +120,40 @@ export const EmployeeDashboard: React.FC = () => {
     updateAppBadge(pendingApproval.length);
   }, [pendingApproval.length]);
 
-  // Fetch initial notifications
-  useEffect(() => {
+  // ── Fetch notifications ────────────────────────────────────────────────────────────
+  // Extracted to a stable callback so it can be called from the vms:refresh
+  // event listener without re-subscribing Supabase channels.
+  const fetchNotifications = useCallback(async () => {
     if (!user?.id) return;
-    supabase.from('employee_notifications')
+    if (import.meta.env.DEV) console.debug('[EmployeeDashboard] fetchNotifications —', user.id);
+    const { data, error } = await supabase
+      .from('employee_notifications')
       .select('*')
       .eq('employee_id', user.id)
       .order('created_at', { ascending: false })
-      .limit(50)
-      .then(({ data, error }) => {
-        if (data && !error) {
-          setEmpNotifications(data as any);
-        }
-      });
+      .limit(50);
+    if (data && !error) {
+      setEmpNotifications(data as any);
+      if (import.meta.env.DEV) console.debug('[EmployeeDashboard] Notifications refreshed —', data.length);
+    }
   }, [user?.id]);
+
+  // Initial fetch
+  useEffect(() => {
+    fetchNotifications();
+  }, [fetchNotifications]);
+
+  // ── vms:refresh listener ───────────────────────────────────────────────────────────
+  // Responds to SW postMessage, visibilitychange, and cross-tab broadcasts.
+  // Always re-fetches *this employee's* notifications (scoped, cheap query).
+  useEffect(() => {
+    const handler = () => {
+      if (import.meta.env.DEV) console.debug('[EmployeeDashboard] vms:refresh — re-fetching notifications');
+      fetchNotifications();
+    };
+    window.addEventListener('vms:refresh', handler);
+    return () => window.removeEventListener('vms:refresh', handler);
+  }, [fetchNotifications]);
 
   // Tab & Search filtered list
   const filteredVisitors = useMemo(() => {
@@ -156,16 +177,17 @@ export const EmployeeDashboard: React.FC = () => {
     });
   }, [todaysVisitors, statusFilter, searchQuery]);
 
-  // Supabase Realtime Subscription
-  useEffect(() => {
-    if (!user?.id) return;
-
-    const visitorChannel = supabase.channel(`host-${user.id}`)
-      .on(
+  // ── Supabase Realtime — employee-specific channels ─────────────────────────
+  // Wrapped with useRealtimeHealth for automatic reconnection + backoff.
+  // These channels play audio/show toasts; visitor state comes from VisitorContext.
+  useRealtimeHealth({
+    channelName: `host-${user?.id ?? 'none'}`,
+    enabled: !!user?.id,
+    setupListeners: (channel) => {
+      channel.on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'visitors', filter: `host_employee_id=eq.${user.id}` },
+        { event: '*', schema: 'public', table: 'visitors', filter: `host_employee_id=eq.${user?.id}` },
         (payload) => {
-          // Play sound and show toast based on status
           if (payload.eventType === 'INSERT') {
             const newVisitor = payload.new as Visitor;
             const audio = new Audio('/VMS/sounds/visitor-arrived.mp3');
@@ -174,27 +196,36 @@ export const EmployeeDashboard: React.FC = () => {
           } else if (payload.eventType === 'UPDATE') {
             const updatedVisitor = payload.new as Visitor;
             if (updatedVisitor.status === 'APPROVED') {
-              const audio = new Audio('/VMS/sounds/approval.mp3');
-              audio.play().catch(e => console.warn('Audio play failed', e));
+              new Audio('/VMS/sounds/approval.mp3').play().catch(() => {});
             } else if (updatedVisitor.status === 'REJECTED') {
-              const audio = new Audio('/VMS/sounds/rejected.mp3');
-              audio.play().catch(e => console.warn('Audio play failed', e));
+              new Audio('/VMS/sounds/rejected.mp3').play().catch(() => {});
             } else if (updatedVisitor.status === 'COMPLETED' || updatedVisitor.meetingCompletedTime) {
-              const audio = new Audio('/VMS/sounds/meeting-completed.mp3');
-              audio.play().catch(e => console.warn('Audio play failed', e));
+              new Audio('/VMS/sounds/meeting-completed.mp3').play().catch(() => {});
             }
           }
         }
-      )
-      .subscribe();
+      );
+    },
+    onReconnect: () => {
+      if (import.meta.env.DEV) console.debug('[EmployeeDashboard] visitor channel reconnected — re-fetching notifications');
+      fetchNotifications();
+    },
+  });
 
-    const notifChannel = supabase.channel(`notifs-${user.id}`)
-      .on(
+  useRealtimeHealth({
+    channelName: `notifs-${user?.id ?? 'none'}`,
+    enabled: !!user?.id,
+    setupListeners: (channel) => {
+      channel.on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'employee_notifications', filter: `employee_id=eq.${user.id}` },
+        { event: '*', schema: 'public', table: 'employee_notifications', filter: `employee_id=eq.${user?.id}` },
         (payload) => {
           if (payload.eventType === 'INSERT') {
-            setEmpNotifications(prev => [payload.new as any, ...prev]);
+            setEmpNotifications(prev => {
+              // Deduplicate: don't add if already present
+              if (prev.some(n => n.id === payload.new.id)) return prev;
+              return [payload.new as any, ...prev];
+            });
             if (payload.new.type === 'REMINDER') {
               const audio = new Audio('/VMS/sounds/reminder.mp3');
               audio.play().catch(e => console.warn('Audio play failed', e));
@@ -206,14 +237,10 @@ export const EmployeeDashboard: React.FC = () => {
             setEmpNotifications(prev => prev.filter(n => n.id !== payload.old.id));
           }
         }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(visitorChannel);
-      supabase.removeChannel(notifChannel);
-    };
-  }, [user?.id, toast]);
+      );
+    },
+    onReconnect: () => fetchNotifications(),
+  });
 
   const handleMarkAsRead = async (id: string) => {
     setEmpNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));

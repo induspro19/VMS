@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useVisitor } from '../../context/VisitorContext';
 import { useNotification } from '../../context/NotificationContext';
 import { useAppUsers } from '../../context/UserContext';
+import { useSettings } from '../../context/SettingsContext';
 import { 
   ShieldCheck, CheckCircle, ArrowLeft, Sun, Globe, Clock,
   Phone, User, Building, Mail, Network, FileText, UserSquare, Car, 
@@ -15,7 +16,12 @@ export const RegisterPortal: React.FC = () => {
   const { registerVisitor, getVisitorHistory } = useVisitor();
   const { sendPush } = useNotification();
   const { users } = useAppUsers();
+  const { settings } = useSettings();
   const navigate = useNavigate();
+
+  // Departments from Department Master — sorted alphabetically, active only
+  // (SettingsContext stores them as plain strings; all stored = active)
+  const activeDepartments = [...settings.departments].sort((a, b) => a.localeCompare(b));
   
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -41,6 +47,14 @@ export const RegisterPortal: React.FC = () => {
     const timer = setInterval(() => setTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
+
+  // Guard: if a previously auto-filled department is no longer in the master list, clear it
+  useEffect(() => {
+    if (formData.department && activeDepartments.length > 0 && !activeDepartments.includes(formData.department)) {
+      setFormData(prev => ({ ...prev, department: '' }));
+      setError('Previously selected department is no longer available.');
+    }
+  }, [activeDepartments, formData.department]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     if (e.target.name === 'hostEmployeeId') {
@@ -258,11 +272,16 @@ export const RegisterPortal: React.FC = () => {
                 <div className="kiosk-input-icon"><Network size={18} /></div>
                 <div className="kiosk-select-wrapper">
                   <select name="department" value={formData.department} onChange={handleChange} required>
-                    <option value="" disabled hidden>Select department</option>
-                    <option value="Engineering">Engineering</option>
-                    <option value="HR">Human Resources</option>
-                    <option value="Sales">Sales</option>
-                    <option value="Management">Management</option>
+                    <option value="" disabled hidden>
+                      {activeDepartments.length === 0 ? 'No departments available' : 'Select department'}
+                    </option>
+                    {activeDepartments.length === 0 ? (
+                      <option value="" disabled>No departments available. Please add a department first.</option>
+                    ) : (
+                      activeDepartments.map(dept => (
+                        <option key={dept} value={dept}>{dept}</option>
+                      ))
+                    )}
                   </select>
                   <ChevronDown size={16} className="kiosk-select-icon" />
                 </div>

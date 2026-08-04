@@ -168,6 +168,59 @@
   color: #DC2626;
 }
 
+/* ── Group visitor registration ───────────────────────────────── */
+.kiosk-group-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* The + (add) button */
+.kiosk-group-add-btn {
+  flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #2563EB;
+  border-radius: 10px;
+  background-color: #EFF6FF;
+  color: #2563EB;
+  cursor: pointer;
+  transition: background-color 0.18s, transform 0.1s;
+}
+.kiosk-group-add-btn:hover {
+  background-color: #2563EB;
+  color: #ffffff;
+}
+.kiosk-group-add-btn:active {
+  transform: scale(0.92);
+}
+
+/* The × (remove) button */
+.kiosk-group-remove-btn {
+  flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #F87171;
+  border-radius: 10px;
+  background-color: #FEF2F2;
+  color: #DC2626;
+  cursor: pointer;
+  transition: background-color 0.18s, transform 0.1s;
+}
+.kiosk-group-remove-btn:hover {
+  background-color: #DC2626;
+  color: #ffffff;
+}
+.kiosk-group-remove-btn:active {
+  transform: scale(0.92);
+}
+
 .kiosk-input-wrapper {
   display: flex;
   align-items: center;

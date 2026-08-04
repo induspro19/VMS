@@ -7,7 +7,7 @@ import {
   ShieldCheck, CheckCircle, ArrowLeft, Sun, Globe, Clock,
   Phone, User, Building, Mail, Network, FileText, UserSquare, Car, 
   UserPlus, RefreshCw, X, ChevronDown, Calendar,
-  Watch, Monitor
+  Watch, Monitor, Plus
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import './RegisterPortal.css';
@@ -37,6 +37,15 @@ export const RegisterPortal: React.FC = () => {
     hostEmployeeId: '',
     purpose: '',
   });
+
+  // Group registration — extra visitor names beyond the first (main) visitor
+  const [additionalVisitors, setAdditionalVisitors] = useState<string[]>([]);
+
+  const addVisitor = () => setAdditionalVisitors(prev => [...prev, '']);
+  const removeVisitor = (idx: number) =>
+    setAdditionalVisitors(prev => prev.filter((_, i) => i !== idx));
+  const updateVisitor = (idx: number, value: string) =>
+    setAdditionalVisitors(prev => prev.map((v, i) => (i === idx ? value : v)));
 
   const mobileInputRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
@@ -100,6 +109,7 @@ export const RegisterPortal: React.FC = () => {
       hostEmployeeId: '',
       purpose: '',
     });
+    setAdditionalVisitors([]);
     setIsAutoFilled(false);
     setError(null);
     if (mobileInputRef.current) {
@@ -120,12 +130,20 @@ export const RegisterPortal: React.FC = () => {
     }
 
     try {
+      // Register main visitor
       await registerVisitor(formData);
-      
-      // Simulate notification to employee
+
+      // Register additional group members with the same visit details
+      const extras = additionalVisitors.map(n => n.trim()).filter(Boolean);
+      for (const extraName of extras) {
+        await registerVisitor({ ...formData, name: extraName });
+      }
+
       sendPush(
-        'New Visitor Request', 
-        `${formData.name} from ${formData.company} is waiting for your approval.`
+        'New Visitor Request',
+        extras.length > 0
+          ? `${formData.name} + ${extras.length} more from ${formData.company} are waiting for approval.`
+          : `${formData.name} from ${formData.company} is waiting for your approval.`
       );
 
       setSubmitted(true);
@@ -135,6 +153,7 @@ export const RegisterPortal: React.FC = () => {
   };
 
   if (submitted) {
+    const totalCount = 1 + additionalVisitors.filter(n => n.trim()).length;
     return (
       <div className="portal-kiosk-container animate-fade-in">
         <div className="portal-success-card">
@@ -142,7 +161,11 @@ export const RegisterPortal: React.FC = () => {
             <CheckCircle size={48} />
           </div>
           <h2>Registration Successful</h2>
-          <p>Your details have been submitted. Please wait for employee approval.</p>
+          <p>
+            {totalCount > 1
+              ? `${totalCount} visitors have been registered. Please wait for employee approval.`
+              : 'Your details have been submitted. Please wait for employee approval.'}
+          </p>
           <div className="status-badge">
             <div className="spinner"></div>
             <span>Status: Pending Approval</span>
@@ -221,20 +244,55 @@ export const RegisterPortal: React.FC = () => {
               </div>
             </div>
 
-            {/* Full Name */}
+            {/* Full Name — main visitor with inline + button */}
             <div className="kiosk-form-group">
-              <label>Full Name <span>*</span></label>
-              <div className="kiosk-input-wrapper">
-                <div className="kiosk-input-icon"><User size={18} /></div>
-                <input 
-                  type="text"
-                  name="name"
-                  value={formData.name}
-                  onChange={handleChange}
-                  required
-                  placeholder="Enter full name"
-                />
+              <label>Name of Visitor <span>*</span></label>
+              {/* Main visitor row */}
+              <div className="kiosk-group-row">
+                <div className="kiosk-input-wrapper" style={{ flex: 1 }}>
+                  <div className="kiosk-input-icon"><User size={18} /></div>
+                  <input 
+                    type="text"
+                    name="name"
+                    value={formData.name}
+                    onChange={handleChange}
+                    required
+                    placeholder="Enter full name"
+                  />
+                </div>
+                <button
+                  type="button"
+                  className="kiosk-group-add-btn"
+                  onClick={addVisitor}
+                  title="Add another visitor"
+                >
+                  <Plus size={16} />
+                </button>
               </div>
+
+              {/* Additional visitor rows */}
+              {additionalVisitors.map((name, idx) => (
+                <div key={idx} className="kiosk-group-row" style={{ marginTop: '8px' }}>
+                  <div className="kiosk-input-wrapper" style={{ flex: 1 }}>
+                    <div className="kiosk-input-icon"><User size={18} /></div>
+                    <input
+                      type="text"
+                      value={name}
+                      onChange={e => updateVisitor(idx, e.target.value)}
+                      placeholder={`Visitor ${idx + 2} name`}
+                      autoFocus
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    className="kiosk-group-remove-btn"
+                    onClick={() => removeVisitor(idx)}
+                    title="Remove visitor"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+              ))}
             </div>
 
             {/* Company Name */}

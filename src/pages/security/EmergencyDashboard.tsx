@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { useVisitor } from '../../context/VisitorContext';
+import { useSettings } from '../../context/SettingsContext';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '../../components/ui/Table';
 import { Badge } from '../../components/ui/Badge';
@@ -10,6 +11,7 @@ import { utils, writeFile } from 'xlsx';
 
 export const EmergencyDashboard: React.FC = () => {
   const { visitors } = useVisitor();
+  const { settings } = useSettings();
   const navigate = useNavigate();
 
   const insideVisitors = useMemo(() => visitors.filter(v => v.status === 'INSIDE' || v.status === 'READY_FOR_EXIT'), [visitors]);
@@ -188,18 +190,18 @@ export const EmergencyDashboard: React.FC = () => {
             </CardHeader>
             <CardContent>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                <div>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Security Chief</div>
-                  <div style={{ fontWeight: 500 }}>+1 (555) 019-2831</div>
-                </div>
-                <div>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Facility Manager</div>
-                  <div style={{ fontWeight: 500 }}>+1 (555) 991-8273</div>
-                </div>
-                <div>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Local Emergency</div>
-                  <div style={{ fontWeight: 500, color: 'var(--danger-color)', fontSize: '1.25rem' }}>911</div>
-                </div>
+                {settings.emergencyContacts.length === 0 && (
+                  <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>No contacts configured.</p>
+                )}
+                {settings.emergencyContacts.map(contact => (
+                  <div key={contact.id}>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{contact.role}</div>
+                    <div style={{
+                      fontWeight: 500,
+                      ...(contact.isEmergency ? { color: 'var(--danger-color)', fontSize: '1.25rem' } : {})
+                    }}>{contact.phone}</div>
+                  </div>
+                ))}
               </div>
             </CardContent>
           </Card>

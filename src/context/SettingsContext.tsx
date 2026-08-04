@@ -1,6 +1,13 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 
+export interface EmergencyContact {
+  id: string;       // client-generated uuid for React key / editing
+  role: string;     // e.g. "Security Chief"
+  phone: string;    // e.g. "+1 (555) 019-2831"
+  isEmergency?: boolean; // renders number in danger-red (for 911-style numbers)
+}
+
 export interface GlobalSettings {
   departments: string[];
   employees: string[];
@@ -8,11 +15,18 @@ export interface GlobalSettings {
   meetingDurationMaxHours: number;
   companyName: string;
   companyLogo: string;
+  emergencyContacts: EmergencyContact[];
   _updatedAt?: number; // timestamp ms for conflict resolution
 }
 
 // Only used on absolute first install
 const DB_DEFAULT_DEPARTMENTS = ['Engineering', 'HR', 'Sales', 'Management', 'Operations'];
+
+const DEFAULT_EMERGENCY_CONTACTS: EmergencyContact[] = [
+  { id: 'ec-1', role: 'Security Chief',   phone: '+1 (555) 019-2831', isEmergency: false },
+  { id: 'ec-2', role: 'Facility Manager', phone: '+1 (555) 991-8273', isEmergency: false },
+  { id: 'ec-3', role: 'Local Emergency',  phone: '911',               isEmergency: true  },
+];
 
 const FALLBACK_DEFAULTS: GlobalSettings = {
   departments: DB_DEFAULT_DEPARTMENTS,
@@ -21,6 +35,7 @@ const FALLBACK_DEFAULTS: GlobalSettings = {
   meetingDurationMaxHours: 4,
   companyName: 'Enterprise VMS',
   companyLogo: '',
+  emergencyContacts: DEFAULT_EMERGENCY_CONTACTS,
   _updatedAt: 0,
 };
 
@@ -42,6 +57,7 @@ function mapRowToSettings(data: any): GlobalSettings {
     meetingDurationMaxHours: data.meeting_duration_max_hours || FALLBACK_DEFAULTS.meetingDurationMaxHours,
     companyName: data.company_name || FALLBACK_DEFAULTS.companyName,
     companyLogo: data.company_logo || '',
+    emergencyContacts: Array.isArray(data.emergency_contacts) ? data.emergency_contacts : DEFAULT_EMERGENCY_CONTACTS,
     _updatedAt: data.updated_at ? new Date(data.updated_at).getTime() : 0,
   };
 }
@@ -116,6 +132,7 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
               visitor_purposes: FALLBACK_DEFAULTS.visitorPurposes,
               meeting_duration_max_hours: FALLBACK_DEFAULTS.meetingDurationMaxHours,
               company_name: FALLBACK_DEFAULTS.companyName,
+              emergency_contacts: DEFAULT_EMERGENCY_CONTACTS,
               updated_at: new Date().toISOString(),
             }, { onConflict: 'id' });
           }
@@ -177,6 +194,7 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         meeting_duration_max_hours: merged.meetingDurationMaxHours,
         company_name: merged.companyName,
         company_logo: merged.companyLogo,
+        emergency_contacts: merged.emergencyContacts,
         updated_at: new Date(now).toISOString(),
       }, { onConflict: 'id' });
 

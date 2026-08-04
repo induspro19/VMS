@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useSettings } from '../../context/SettingsContext';
-import { Save, Plus, Trash2, Building, ShieldCheck, Tag, Shield, User, Power } from 'lucide-react';
+import type { EmergencyContact } from '../../context/SettingsContext';
+import { Save, Plus, Trash2, Building, ShieldCheck, Tag, Shield, User, Power, Phone, Pencil, Check, X as XIcon } from 'lucide-react';
 import { useToast } from '../../context/ToastContext';
 import { useAppUsers } from '../../context/UserContext';
 import { useVisitor } from '../../context/VisitorContext';
@@ -16,6 +17,13 @@ export const SettingsModule: React.FC = () => {
   const [newPurpose, setNewPurpose] = useState('');
   const [companyName, setCompanyName] = useState(settings.companyName);
   const [maxHours, setMaxHours] = useState(settings.meetingDurationMaxHours);
+
+  // ─ Emergency Contacts state ───────────────────────────────────────────────────
+  const [ecRole, setEcRole]           = useState('');
+  const [ecPhone, setEcPhone]         = useState('');
+  const [ecIsEmergency, setEcIsEmergency] = useState(false);
+  // Inline edit: stores the contact being edited (null = none)
+  const [editingContact, setEditingContact] = useState<EmergencyContact | null>(null);
 
   const { officers, addOfficer, deleteOfficer, toggleOfficerActive } = useSecurityShift();
   const [newOfficerName, setNewOfficerName] = useState('');
@@ -83,6 +91,44 @@ export const SettingsModule: React.FC = () => {
     const target = settings.visitorPurposes[idx];
     updateSettings({ visitorPurposes: settings.visitorPurposes.filter((_, i) => i !== idx) });
     toast(`Purpose "${target}" removed.`, 'success');
+  };
+
+  // ─ Emergency Contact handlers ─────────────────────────────────────────────
+  const addContact = () => {
+    const role  = ecRole.trim();
+    const phone = ecPhone.trim();
+    if (!role || !phone) { toast('Role and Phone are required.', 'error'); return; }
+    const newContact: EmergencyContact = {
+      id: `ec-${Date.now()}`,
+      role,
+      phone,
+      isEmergency: ecIsEmergency,
+    };
+    updateSettings({ emergencyContacts: [...settings.emergencyContacts, newContact] });
+    setEcRole(''); setEcPhone(''); setEcIsEmergency(false);
+    toast(`Contact "${role}" added.`, 'success');
+  };
+
+  const saveEditContact = () => {
+    if (!editingContact) return;
+    if (!editingContact.role.trim() || !editingContact.phone.trim()) {
+      toast('Role and Phone cannot be empty.', 'error'); return;
+    }
+    updateSettings({
+      emergencyContacts: settings.emergencyContacts.map(c =>
+        c.id === editingContact.id ? editingContact : c
+      ),
+    });
+    setEditingContact(null);
+    toast('Contact updated.', 'success');
+  };
+
+  const deleteContact = (id: string) => {
+    const target = settings.emergencyContacts.find(c => c.id === id);
+    if (!target) return;
+    if (!window.confirm(`Delete contact "${target.role}"?`)) return;
+    updateSettings({ emergencyContacts: settings.emergencyContacts.filter(c => c.id !== id) });
+    toast(`Contact "${target.role}" deleted.`, 'success');
   };
 
   return (
@@ -234,6 +280,133 @@ export const SettingsModule: React.FC = () => {
                     >
                       <Trash2 size={14} />
                     </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Emergency Contacts Card */}
+          <div className="ui-card" style={{ padding: '20px', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <Phone size={20} color="var(--danger-color)" /> Emergency Contacts
+            </div>
+            <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: '0 0 14px 0' }}>
+              Manage emergency phone numbers shown on the Security Emergency Dashboard.
+            </p>
+
+            {/* Add new contact form */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto auto', gap: '8px', marginBottom: '14px', alignItems: 'center' }}>
+              <input
+                className="ui-input"
+                placeholder="Role (e.g. Security Chief)"
+                value={ecRole}
+                onChange={e => setEcRole(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && addContact()}
+              />
+              <input
+                className="ui-input"
+                placeholder="Phone (e.g. +91 98765 43210)"
+                value={ecPhone}
+                onChange={e => setEcPhone(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && addContact()}
+              />
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--text-secondary)', whiteSpace: 'nowrap', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={ecIsEmergency}
+                  onChange={e => setEcIsEmergency(e.target.checked)}
+                  style={{ accentColor: 'var(--danger-color)', width: '14px', height: '14px' }}
+                />
+                Red highlight
+              </label>
+              <button className="ui-button ui-button-primary" onClick={addContact} style={{ padding: '0 14px' }}>
+                <Plus size={16} /> Add
+              </button>
+            </div>
+
+            {/* Contact list */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '320px', overflowY: 'auto', paddingRight: '2px' }}>
+              {settings.emergencyContacts.length === 0 && (
+                <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px', padding: '1.5rem 0' }}>
+                  No emergency contacts. Add your first contact above.
+                </div>
+              )}
+              {settings.emergencyContacts.map(contact => {
+                const isEditing = editingContact?.id === contact.id;
+                return (
+                  <div key={contact.id} style={{ minHeight: '52px', borderRadius: '8px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-main)', display: 'flex', alignItems: 'center', padding: '0 12px', gap: '10px', justifyContent: 'space-between' }}>
+                    {isEditing ? (
+                      /* ── Edit mode ── */
+                      <>
+                        <div style={{ display: 'flex', gap: '8px', flex: 1, alignItems: 'center', flexWrap: 'wrap' }}>
+                          <input
+                            className="ui-input"
+                            style={{ flex: 1, minWidth: '120px' }}
+                            value={editingContact.role}
+                            onChange={e => setEditingContact({ ...editingContact, role: e.target.value })}
+                            placeholder="Role"
+                          />
+                          <input
+                            className="ui-input"
+                            style={{ flex: 1, minWidth: '140px' }}
+                            value={editingContact.phone}
+                            onChange={e => setEditingContact({ ...editingContact, phone: e.target.value })}
+                            placeholder="Phone"
+                          />
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '12px', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                            <input
+                              type="checkbox"
+                              checked={!!editingContact.isEmergency}
+                              onChange={e => setEditingContact({ ...editingContact, isEmergency: e.target.checked })}
+                              style={{ accentColor: 'var(--danger-color)' }}
+                            />
+                            Red
+                          </label>
+                        </div>
+                        <div style={{ display: 'flex', gap: '6px' }}>
+                          <button className="ui-button ui-button-primary ui-button-sm" onClick={saveEditContact} style={{ padding: '4px 8px' }} title="Save">
+                            <Check size={14} />
+                          </button>
+                          <button className="ui-button ui-button-secondary ui-button-sm" onClick={() => setEditingContact(null)} style={{ padding: '4px 8px' }} title="Cancel">
+                            <XIcon size={14} />
+                          </button>
+                        </div>
+                      </>
+                    ) : (
+                      /* ── View mode ── */
+                      <>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1 }}>
+                          <div style={{ width: '30px', height: '30px', borderRadius: '6px', backgroundColor: contact.isEmergency ? '#FEE2E2' : '#DBEAFE', color: contact.isEmergency ? '#DC2626' : '#1D4ED8', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                            <Phone size={14} />
+                          </div>
+                          <div>
+                            <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>{contact.role}</div>
+                            <div style={{ fontSize: '13px', color: contact.isEmergency ? 'var(--danger-color)' : 'var(--text-secondary)', fontWeight: contact.isEmergency ? 600 : 400 }}>
+                              {contact.phone}
+                            </div>
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', gap: '6px' }}>
+                          <button
+                            className="ui-button ui-button-secondary ui-button-sm"
+                            onClick={() => setEditingContact({ ...contact })}
+                            style={{ padding: '4px 8px' }}
+                            title="Edit contact"
+                          >
+                            <Pencil size={14} />
+                          </button>
+                          <button
+                            className="ui-button ui-button-danger ui-button-sm"
+                            onClick={() => deleteContact(contact.id)}
+                            style={{ padding: '4px 8px' }}
+                            title="Delete contact"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </>
+                    )}
                   </div>
                 );
               })}
